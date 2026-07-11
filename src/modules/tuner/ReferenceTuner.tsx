@@ -343,12 +343,12 @@ function TuningPicker({ current, options, onChange }: {
 interface MeterProps { detuneHz: number; isActive: boolean; inTune: boolean }
 
 function HorizontalMeter({ detuneHz, isActive, inTune }: MeterProps) {
-  const W = 300, H = 64, cx = W / 2
+  const W = 300, H = 72, cx = W / 2
   const arcLeft = 16
   const arcRight = W - 16
-  const arcBaseY = 50
-  const arcPeakY = 14
-  const pivotY = 54
+  const arcBaseY = 56
+  const arcPeakY = 22
+  const pivotY = 60
   const sweepDeg = 60 // total sweep: -30° (flat) to +30° (sharp)
   // Drive needle by absolute frequency delta so movement reflects real Hz difference.
   // Negative (flat): tighten. Positive (sharp): loosen.
@@ -372,17 +372,38 @@ function HorizontalMeter({ detuneHz, isActive, inTune }: MeterProps) {
     const x = cx + (c / METER_RANGE) * (cx - arcLeft)
     const y2 = arcY(x)
     const y1 = y2 - (major ? 10 : 6)
-    return { x, y1, y2, major, c }
+    const ly = y1 - 5
+    return { x, y1, y2, major, c, ly }
   })
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block" }} aria-hidden>
       <path d={`M ${arcLeft},${arcBaseY} Q ${cx},${arcPeakY} ${arcRight},${arcBaseY}`}
-        fill="none" stroke="var(--separator)" strokeWidth={1.2} />
+        fill="none" stroke="var(--text-tertiary)" strokeWidth={1.3} opacity={0.42} />
       {ticks.map(({ x, y1, y2, major, c }) => (
         <line key={c} x1={x} y1={y1} x2={x} y2={y2}
-          stroke={major ? "rgba(60,60,67,0.25)" : "rgba(60,60,67,0.12)"}
+          stroke="var(--text-tertiary)"
+          opacity={major ? 0.58 : 0.32}
           strokeWidth={major ? 1.2 : 0.7} />
       ))}
+      {/* Subtle arc numbers (major only) */}
+      {ticks
+        .filter(({ major, c }) => major && c !== 0)
+        .map(({ x, ly, c }) => (
+          <text
+            key={`lbl-${c}`}
+            x={x}
+            y={ly}
+            textAnchor="middle"
+            fontSize={9}
+            fontWeight={600}
+            letterSpacing={0.1}
+            fill="var(--text-tertiary)"
+            opacity={0.6}
+            style={{ userSelect: "none" }}
+          >
+            {c > 0 ? `+${c}` : `${c}`}
+          </text>
+        ))}
       {/* In-tune zone wedge for arc meter */}
       <path d={`M ${cx - zoneHW},${arcPeakY} L ${cx + zoneHW},${arcPeakY} L ${cx},${pivotY - 6} Z`}
         fill={inTune ? "rgba(52,199,89,0.22)" : "rgba(52,199,89,0.10)"}
@@ -531,14 +552,15 @@ export function ReferenceTuner() {
       </div>
 
       {/* ── Note display ── */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 20px 2px", flexShrink: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 20px 0", flexShrink: 0 }}>
         <div style={{
-          fontSize: 56, fontWeight: 700, letterSpacing: "-1.4px", lineHeight: 1,
+          fontSize: 46, fontWeight: 700, letterSpacing: "-1.0px", lineHeight: 1,
           color: detectedFreq
             ? (inTune && isListening ? "var(--success)" : "var(--foreground)")
-            : "rgba(60,60,67,0.18)",
+            : "var(--text-tertiary)",
+          opacity: detectedFreq ? 1 : 0.72,
           transition: "color 0.4s ease", fontVariantNumeric: "tabular-nums",
-          minHeight: 62, display: "flex", alignItems: "center",
+          minHeight: 54, display: "flex", alignItems: "center",
         }}>
           {hzDisplay}
         </div>
@@ -548,7 +570,15 @@ export function ReferenceTuner() {
       </div>
 
       {/* ── Horizontal meter ── */}
-      <div style={{ padding: "6px 24px 0", flexShrink: 0 }}>
+      <div style={{ padding: "12px 24px 0", flexShrink: 0 }}>
+        <div style={{ textAlign: "center", marginBottom: 6, minHeight: 36 }}>
+          <p style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.6px", lineHeight: 1.05, color: "var(--foreground)", margin: 0 }}>
+            {targetString ? `${targetString.name}${targetString.octave}` : "—"}
+          </p>
+          <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.2px", color: "var(--text-tertiary)", margin: 0, marginTop: 2 }}>
+            {targetFreq ? targetFreq.toFixed(1) : "0.0"}
+          </p>
+        </div>
         <HorizontalMeter
           detuneHz={detuneHz}
           isActive={isListening && detectedFreq !== null}
@@ -563,7 +593,7 @@ export function ReferenceTuner() {
       {/* ── Headstock + string buttons ─────────────────────────────────── */}
       <div style={{
         flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center",
-        minHeight: 0, padding: "6px 8px 0", gap: 10,
+        minHeight: 0, padding: "10px 8px 0", gap: 10,
       }}>
         {/* Left column: C (top) G (bottom) */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: BTN_GAP, paddingTop: TOP_PAD }}>
