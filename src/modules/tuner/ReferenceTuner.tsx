@@ -7,9 +7,9 @@ import {
   frequencyToNote,
   type PitchDetectionResult,
 } from "@/lib/pitch"
-import { ChevronDown, Check, Mic } from "lucide-react"
+import { ChevronDown, Check, Mic, AudioLines } from "lucide-react"
 
-// ── Tunings ──────────────────────────────────────────────────────────────────
+// ── Tunings ───────────────────────────────────────────────────────────────────
 interface StringDef { name: string; freq: number; octave: number }
 interface TuningPreset { id: string; label: string; short: string; strings: StringDef[] }
 
@@ -41,26 +41,30 @@ const TUNINGS: TuningPreset[] = [
 ]
 
 const TUNING_KEY  = "ukepocket_tuning"
-const METER_RANGE = 30
-const ZONE_CENTS  = 5
+const METER_RANGE = 30   // ±30 cents full-scale
+const IN_TUNE_CENTS = 5  // ±5 cents = "in tune"
+
+// ── Clarity / smoothing constants ─────────────────────────────────────────────
+// Lower CLARITY_MIN = more detections (at cost of occasional false readings).
+// SMOOTHER_FAST blends in new readings quickly for a live-needle feel.
+const CLARITY_MIN   = 0.40
+const SMOOTHER_FAST = 0.45   // weight given to new reading (higher = more responsive)
 
 type TuneStatus = "idle" | "listening" | "flat" | "sharp" | "intune"
 
 // ── Layout constants ──────────────────────────────────────────────────────────
-// Headstock SVG is rendered at a fixed width so button positions can be
-// computed precisely from the viewBox coordinates.
+// Headstock SVG rendered at HS_W px so button positions can be computed
+// precisely from the viewBox coordinates.
 //
-// viewBox: "0 0 200 300"
-// Peg key centres (in viewBox units):
+// viewBox "0 0 200 300":
 //   TOP pegs (C / E): cy = 52
 //   BOT pegs (G / A): cy = 142
 //
-// At HS_W=220 px → HS_H = 220 * (300/200) = 330 px
-// TOP_PEG_Y = 330 * (52/300) ≈ 57 px
-// BOT_PEG_Y = 330 * (142/300) ≈ 156 px
-// btn_half   = 52 / 2 = 26 px
-// TOP_PAD    = 57 - 26 = 31 px   (paddingTop on the button column)
-// BTN_GAP    = 156 - 57 - 52 = 47 px (gap between C and G buttons)
+// At HS_W=220 → HS_H=330
+//   TOP_PEG_Y = 330 * 52/300 ≈ 57 px
+//   BOT_PEG_Y = 330 * 142/300 ≈ 156 px
+//   TOP_PAD   = 57 − 26 = 31 px
+//   BTN_GAP   = 156 − 57 − 52 = 47 px
 
 const HS_W       = 220
 const VIEWBOX_H  = 300
@@ -75,26 +79,6 @@ const TOP_PAD    = Math.max(0, TOP_PEG_Y - BTN_HALF)   // ≈ 31
 const BTN_GAP    = BOT_PEG_Y - TOP_PEG_Y - 52          // ≈ 47
 
 // ── Headstock SVG ─────────────────────────────────────────────────────────────
-//
-// Tuning machine "lever key" design per peg:
-//   • String-post hole visible on the headstock FACE (small circle + centre dot)
-//   • Shaft   — horizontal bar connecting headstock edge to the knob
-//   • Knob    — the grippable lever key circle drawn with a cross-grip pattern
-//   • Centre dot — small filled circle in the knob
-//
-// Peg positions in viewBox "0 0 200 300":
-//   Left  side: cx = 16   (shaft from x=16 to x=38, overlapping headstock edge at x=36)
-//   Right side: cx = 184  (shaft from x=162 to x=184)
-//   Top   row:  cy = 52   (C left / E right)
-//   Bottom row: cy = 142  (G left / A right)
-//
-// String post holes on headstock face:
-//   Left posts:  cx = 56  (C cy=52, G cy=142)
-//   Right posts: cx = 144 (E cy=52, A cy=142)
-//
-// Nut at y=170, fretboard to y=300.
-// String x at nut: 78, 91, 109, 122.
-
 const PEG_KNOB = [
   { cx: 16,  cy: 142 }, // G — bottom-left
   { cx: 16,  cy: 52  }, // C — top-left
@@ -102,69 +86,67 @@ const PEG_KNOB = [
   { cx: 184, cy: 142 }, // A — bottom-right
 ]
 const STRING_POST = [
-  { cx: 56,  cy: 142 }, // G
-  { cx: 56,  cy: 52  }, // C
-  { cx: 144, cy: 52  }, // E
-  { cx: 144, cy: 142 }, // A
+  { cx: 56,  cy: 142 },
+  { cx: 56,  cy: 52  },
+  { cx: 144, cy: 52  },
+  { cx: 144, cy: 142 },
 ]
 const NUT_X = [78, 91, 109, 122]
 const STRING_PATHS = [
-  `M ${NUT_X[0]},177 Q 40,162 16,142`,   // G
-  `M ${NUT_X[1]},177 Q 52,115 16,52`,    // C
-  `M ${NUT_X[2]},177 Q 148,115 184,52`,  // E
-  `M ${NUT_X[3]},177 Q 160,162 184,142`, // A
+  `M ${NUT_X[0]},177 Q 40,162 16,142`,
+  `M ${NUT_X[1]},177 Q 52,115 16,52`,
+  `M ${NUT_X[2]},177 Q 148,115 184,52`,
+  `M ${NUT_X[3]},177 Q 160,162 184,142`,
 ]
 const FRET_Y = [206, 237, 268]
 
 interface HeadstockProps {
-  selectedString: number | null
-  inTune: boolean
-  isListening: boolean
+  selectedString: number | null  // user-tapped string
+  autoString:     number | null  // auto-detected closest string
+  inTune:         boolean
+  isListening:    boolean
 }
 
-function MinimalHeadstock({ selectedString, inTune, isListening }: HeadstockProps) {
-  function active(i: number) { return selectedString === i }
+function MinimalHeadstock({ selectedString, autoString, inTune, isListening }: HeadstockProps) {
+  // Active peg = user-selected (if any) else auto-detected
+  const activeIdx = selectedString ?? autoString
+
   function stringColor(i: number) {
-    if (!active(i)) return "rgba(60,60,67,0.2)"
+    if (i !== activeIdx) return "rgba(60,60,67,0.2)"
     return inTune && isListening ? "#34C759" : "var(--primary)"
   }
-  function sw(i: number) { return active(i) ? 2 : 1.4 }
+  function sw(i: number) { return i === activeIdx ? 2 : 1.4 }
   function knobFill(i: number) {
-    if (!active(i)) return "var(--card)"
+    if (i !== activeIdx) return "var(--card)"
     return inTune && isListening ? "#34C759" : "var(--primary)"
   }
   function knobStroke(i: number) {
-    if (!active(i)) return "#C7C7CC"
-    return inTune && isListening ? "#34C759" : "var(--primary)"
+    return i !== activeIdx ? "#C7C7CC"
+      : inTune && isListening ? "#34C759" : "var(--primary)"
   }
   function gripColor(i: number) {
-    return active(i) ? "rgba(255,255,255,0.35)" : "#E0E0E3"
+    return i === activeIdx ? "rgba(255,255,255,0.35)" : "#E0E0E3"
   }
   function dotFill(i: number) {
-    return active(i) ? "rgba(255,255,255,0.7)" : "#C7C7CC"
+    return i === activeIdx ? "rgba(255,255,255,0.7)" : "#C7C7CC"
   }
 
   return (
-    <svg
-      viewBox="0 0 200 300"
-      width={HS_W}
-      height={HS_H}
-      aria-hidden
-      style={{ display: "block", flexShrink: 0 }}
-    >
-      {/* ── Headstock body ──────────────────────────────────────────── */}
+    <svg viewBox="0 0 200 300" width={HS_W} height={HS_H}
+      aria-hidden style={{ display: "block", flexShrink: 0 }}>
+
+      {/* Headstock body */}
       <rect x={36} y={8} width={128} height={162} rx={20}
         fill="var(--card)" stroke="#D1D1D6" strokeWidth={1.5} />
 
-      {/* ── Left peg shafts ─────────────────────────────────────────── */}
+      {/* Left shafts */}
       <rect x={16} y={46} width={24} height={12} rx={3} fill="#E5E7EB" />
       <rect x={16} y={136} width={24} height={12} rx={3} fill="#E5E7EB" />
-
-      {/* ── Right peg shafts ────────────────────────────────────────── */}
+      {/* Right shafts */}
       <rect x={160} y={46} width={24} height={12} rx={3} fill="#E5E7EB" />
       <rect x={160} y={136} width={24} height={12} rx={3} fill="#E5E7EB" />
 
-      {/* ── String post holes on headstock face ─────────────────────── */}
+      {/* String post holes */}
       {STRING_POST.map(({ cx, cy }, i) => (
         <g key={`post-${i}`}>
           <circle cx={cx} cy={cy} r={7} fill="none" stroke="#D1D1D6" strokeWidth={1.2} />
@@ -172,58 +154,49 @@ function MinimalHeadstock({ selectedString, inTune, isListening }: HeadstockProp
         </g>
       ))}
 
-      {/* ── Tuning machine lever keys (knobs) ───────────────────────── */}
-      {/* Draw these BELOW strings so strings sit on top */}
+      {/* Tuning machine lever keys */}
       {PEG_KNOB.map(({ cx, cy }, i) => (
-        <g key={`knob-${i}`} style={{ transition: "all 0.3s ease" }}>
-          {/* Outer knob circle */}
+        <g key={`knob-${i}`} style={{ transition: "all 0.25s ease" }}>
           <circle cx={cx} cy={cy} r={14}
             fill={knobFill(i)} stroke={knobStroke(i)} strokeWidth={1.6}
-            style={{ transition: "fill 0.3s ease, stroke 0.3s ease" }}
-          />
-          {/* Cross grip pattern */}
+            style={{ transition: "fill 0.25s ease, stroke 0.25s ease" }} />
           <line x1={cx} y1={cy - 10} x2={cx} y2={cy + 10}
-            stroke={gripColor(i)} strokeWidth={1.4} style={{ transition: "stroke 0.3s ease" }} />
+            stroke={gripColor(i)} strokeWidth={1.4} style={{ transition: "stroke 0.25s ease" }} />
           <line x1={cx - 10} y1={cy} x2={cx + 10} y2={cy}
-            stroke={gripColor(i)} strokeWidth={1.4} style={{ transition: "stroke 0.3s ease" }} />
-          {/* Knob centre dot */}
+            stroke={gripColor(i)} strokeWidth={1.4} style={{ transition: "stroke 0.25s ease" }} />
           <circle cx={cx} cy={cy} r={3.5}
-            fill={dotFill(i)} style={{ transition: "fill 0.3s ease" }} />
+            fill={dotFill(i)} style={{ transition: "fill 0.25s ease" }} />
         </g>
       ))}
 
-      {/* ── String curves from nut to each knob ─────────────────────── */}
+      {/* String curves from nut to peg */}
       {STRING_PATHS.map((d, i) => (
         <path key={i} d={d}
           stroke={stringColor(i)} strokeWidth={sw(i)}
           fill="none" strokeLinecap="round"
-          style={{ transition: "stroke 0.3s ease" }}
-        />
+          style={{ transition: "stroke 0.25s ease" }} />
       ))}
 
-      {/* ── Nut ────────────────────────────────────────────────────── */}
+      {/* Nut */}
       <rect x={34} y={170} width={132} height={7} rx={2} fill="#C7C7CC" />
 
-      {/* ── Fret lines ──────────────────────────────────────────────── */}
+      {/* Fret lines */}
       {FRET_Y.map((y) => (
         <line key={y} x1={55} y1={y} x2={145} y2={y} stroke="#E5E7EB" strokeWidth={1.2} />
       ))}
 
-      {/* ── Strings on fretboard ────────────────────────────────────── */}
+      {/* Fretboard strings */}
       {NUT_X.map((x, i) => (
         <line key={i} x1={x} y1={177} x2={x} y2={300}
           stroke={stringColor(i)} strokeWidth={sw(i)} strokeLinecap="round"
-          style={{ transition: "stroke 0.3s ease" }}
-        />
+          style={{ transition: "stroke 0.25s ease" }} />
       ))}
 
-      {/* In-tune pulse overlay */}
-      {selectedString !== null && inTune && isListening && (
+      {/* In-tune pulse on fretboard */}
+      {activeIdx !== null && inTune && isListening && (
         <line
-          x1={NUT_X[selectedString]} y1={177}
-          x2={NUT_X[selectedString]} y2={300}
-          stroke="#34C759" strokeWidth={3.5} strokeLinecap="round"
-          opacity={0}
+          x1={NUT_X[activeIdx!]} y1={177} x2={NUT_X[activeIdx!]} y2={300}
+          stroke="#34C759" strokeWidth={3.5} strokeLinecap="round" opacity={0}
           style={{ animation: "stringPulse 1.6s ease-in-out infinite" }}
         />
       )}
@@ -233,55 +206,43 @@ function MinimalHeadstock({ selectedString, inTune, isListening }: HeadstockProp
 
 // ── String button ─────────────────────────────────────────────────────────────
 interface StringBtnProps {
-  name: string
-  isSelected: boolean
-  inTune: boolean
-  isListening: boolean
+  name: string; isSelected: boolean; isAuto: boolean
+  inTune: boolean; isListening: boolean
   onClick: () => void
 }
 
-function StringBtn({ name, isSelected, inTune, isListening, onClick }: StringBtnProps) {
-  const showGreen = isSelected && inTune && isListening
+function StringBtn({ name, isSelected, isAuto, inTune, isListening, onClick }: StringBtnProps) {
+  const showGreen   = (isSelected || isAuto) && inTune && isListening
+  const isHighlight = isSelected || isAuto
   return (
     <button
       onClick={onClick}
       aria-label={`${name} string`}
       aria-pressed={isSelected}
       style={{
-        width:           52,
-        height:          52,
-        borderRadius:    "50%",
-        border:          "none",
-        cursor:          "pointer",
-        display:         "flex",
-        alignItems:      "center",
-        justifyContent:  "center",
-        flexShrink:      0,
-        background:      isSelected
+        width:          52, height: 52, borderRadius: "50%",
+        border:         "none", cursor: "pointer",
+        display:        "flex", alignItems: "center", justifyContent: "center",
+        flexShrink:     0,
+        background:     isSelected
           ? (showGreen ? "#34C759" : "var(--primary)")
-          : "var(--card)",
-        boxShadow:       isSelected
+          : isAuto
+            ? (showGreen ? "rgba(52,199,89,0.15)" : "rgba(0,122,255,0.1)")
+            : "var(--card)",
+        boxShadow:      isHighlight
           ? `0 0 0 2px ${showGreen ? "#34C759" : "var(--primary)"}`
           : "0 0 0 1px rgba(60,60,67,0.14), 0 2px 6px rgba(0,0,0,0.07)",
-        transition:      "background 0.22s ease, box-shadow 0.22s ease",
+        transition:     "background 0.22s ease, box-shadow 0.22s ease",
       }}
-      onPointerDown={(e) => {
-        (e.currentTarget as HTMLElement).style.transform = "scale(0.9)"
-        e.currentTarget.setPointerCapture(e.pointerId)
-      }}
+      onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.9)"; e.currentTarget.setPointerCapture(e.pointerId) }}
       onPointerUp={(e)     => { (e.currentTarget as HTMLElement).style.transform = "scale(1)" }}
       onPointerCancel={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)" }}
     >
-      <span
-        style={{
-          fontSize:      19,
-          fontWeight:    600,
-          letterSpacing: "-0.5px",
-          color:         isSelected ? "#FFFFFF" : "var(--foreground)",
-          transition:    "color 0.2s ease",
-          pointerEvents: "none",
-        }}
-      >
+      <span style={{
+        fontSize: 19, fontWeight: 600, letterSpacing: "-0.5px",
+        color:    isSelected ? "#FFFFFF" : isAuto ? "var(--primary)" : "var(--foreground)",
+        transition: "color 0.2s ease", pointerEvents: "none",
+      }}>
         {name}
       </span>
     </button>
@@ -291,27 +252,29 @@ function StringBtn({ name, isSelected, inTune, isListening, onClick }: StringBtn
 // ── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: TuneStatus }) {
   const cfg = {
-    idle:      { text: "Select a string", color: "var(--text-tertiary)" },
-    listening: { text: "Listening…",      color: "var(--text-tertiary)" },
-    flat:      { text: "Too Low",         color: "var(--destructive)"   },
-    sharp:     { text: "Too High",        color: "var(--warning)"       },
-    intune:    { text: "In Tune",         color: "var(--success)"       },
+    idle:      { text: "Tap a string or pluck your ukulele", color: "var(--text-tertiary)" },
+    listening: { text: "Listening…",                          color: "var(--text-tertiary)" },
+    flat:      { text: "Too Flat",                            color: "var(--destructive)"   },
+    sharp:     { text: "Too Sharp",                           color: "var(--warning)"       },
+    intune:    { text: "In Tune",                             color: "var(--success)"       },
   }[status]
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 22 }}>
       {status === "intune" && <Check size={14} strokeWidth={2.5} style={{ color: "var(--success)" }} />}
-      <span style={{ fontSize: 15, fontWeight: status === "intune" ? 600 : 400, color: cfg.color, transition: "color 0.3s ease" }}>
+      <span style={{
+        fontSize: 15, fontWeight: status === "intune" ? 600 : 400,
+        color: cfg.color, transition: "color 0.3s ease",
+      }}>
         {cfg.text}
       </span>
     </div>
   )
 }
 
-// ── Tuning picker ─────────────────────────────────────────────────────────────
-interface TuningPickerProps {
+// ── Tuning preset picker ──────────────────────────────────────────────────────
+function TuningPicker({ current, options, onChange }: {
   current: TuningPreset; options: TuningPreset[]; onChange: (id: string) => void
-}
-function TuningPicker({ current, options, onChange }: TuningPickerProps) {
+}) {
   const [open, setOpen] = useState(false)
   return (
     <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
@@ -329,7 +292,8 @@ function TuningPicker({ current, options, onChange }: TuningPickerProps) {
         <span>{current.label}</span>
         <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>({current.short})</span>
         <ChevronDown size={14} strokeWidth={2}
-          style={{ color: "var(--text-tertiary)", transition: "transform 0.2s ease", transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
+          style={{ color: "var(--text-tertiary)", transition: "transform 0.2s ease",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
       </button>
       {open && (
         <>
@@ -341,17 +305,14 @@ function TuningPicker({ current, options, onChange }: TuningPickerProps) {
             overflow: "hidden", minWidth: 200, animation: "sheetUp 0.18s ease",
           }}>
             {options.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => { onChange(t.id); setOpen(false) }}
+              <button key={t.id} onClick={() => { onChange(t.id); setOpen(false) }}
                 style={{
                   width: "100%", display: "flex", alignItems: "center",
                   padding: "12px 16px", border: "none",
                   borderBottom: "1px solid var(--separator)",
                   background: t.id === current.id ? "rgba(0,122,255,0.06)" : "transparent",
                   cursor: "pointer", gap: 10, fontFamily: "inherit", textAlign: "left",
-                }}
-              >
+                }}>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 15, fontWeight: 500, color: "var(--foreground)", margin: 0 }}>{t.label}</p>
                   <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0, marginTop: 2 }}>{t.short}</p>
@@ -368,11 +329,12 @@ function TuningPicker({ current, options, onChange }: TuningPickerProps) {
 
 // ── Horizontal tuning meter ───────────────────────────────────────────────────
 interface MeterProps { cents: number; isActive: boolean; inTune: boolean }
+
 function HorizontalMeter({ cents, isActive, inTune }: MeterProps) {
   const W = 300, H = 52, cx = W / 2, trackY = 38, zoneTop = 8
   const clamped = Math.max(-METER_RANGE, Math.min(METER_RANGE, cents))
   const needleX = isActive ? cx + (clamped / METER_RANGE) * cx : cx
-  const zoneHW  = (ZONE_CENTS / METER_RANGE) * cx
+  const zoneHW  = (IN_TUNE_CENTS / METER_RANGE) * cx
   const ticks   = Array.from({ length: 13 }, (_, i) => {
     const c = -30 + i * 5; const major = c % 10 === 0
     return { x: cx + (c / METER_RANGE) * cx, major, c }
@@ -385,19 +347,22 @@ function HorizontalMeter({ cents, isActive, inTune }: MeterProps) {
           stroke={major ? "rgba(60,60,67,0.25)" : "rgba(60,60,67,0.12)"}
           strokeWidth={major ? 1.2 : 0.7} />
       ))}
+      {/* In-tune zone triangle */}
       <path d={`M ${cx - zoneHW},${zoneTop} L ${cx + zoneHW},${zoneTop} L ${cx},${trackY} Z`}
         fill={inTune ? "rgba(52,199,89,0.22)" : "rgba(52,199,89,0.10)"}
         style={{ transition: "fill 0.4s ease" }} />
       <path d={`M ${cx - zoneHW},${zoneTop} L ${cx + zoneHW},${zoneTop} L ${cx},${trackY} Z`}
         fill="none" stroke={inTune ? "rgba(52,199,89,0.55)" : "rgba(52,199,89,0.22)"} strokeWidth={0.8}
         style={{ transition: "stroke 0.4s ease" }} />
+      {/* Needle */}
       {isActive && (
         <>
           <line x1={needleX} y1={zoneTop - 2} x2={needleX} y2={trackY + 8}
-            stroke="var(--primary)" strokeWidth={2} strokeLinecap="round"
-            style={{ transition: "x1 180ms cubic-bezier(0.22,1,0.36,1), x2 180ms cubic-bezier(0.22,1,0.36,1)" }} />
-          <circle cx={needleX} cy={trackY + 5} r={3.5} fill="var(--primary)"
-            style={{ transition: "cx 180ms cubic-bezier(0.22,1,0.36,1)" }} />
+            stroke={inTune ? "#34C759" : "var(--primary)"} strokeWidth={2} strokeLinecap="round"
+            style={{ transition: "x1 120ms cubic-bezier(0.22,1,0.36,1), x2 120ms cubic-bezier(0.22,1,0.36,1), stroke 0.3s ease" }} />
+          <circle cx={needleX} cy={trackY + 5} r={3.5}
+            fill={inTune ? "#34C759" : "var(--primary)"}
+            style={{ transition: "cx 120ms cubic-bezier(0.22,1,0.36,1), fill 0.3s ease" }} />
         </>
       )}
     </svg>
@@ -406,92 +371,112 @@ function HorizontalMeter({ cents, isActive, inTune }: MeterProps) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function ReferenceTuner() {
-  const [tuningId,       setTuningId]    = useState<string>(() => {
+  const [tuningId,        setTuningId]        = useState<string>(() => {
     try { return localStorage.getItem(TUNING_KEY) ?? "standard" } catch { return "standard" }
   })
-  const [selectedString, setSelected]   = useState<number | null>(null)
-  const [detectedFreq,   setDetectedFreq] = useState<number | null>(null)
-  const [isListening,    setIsListening] = useState(false)
-  const [micError,       setMicError]   = useState(false)
-  const freqSmoother = useRef(0)
+  // User's explicitly selected string (tap on a button)
+  const [selectedString,  setSelectedString]  = useState<number | null>(null)
+  // Auto-detected closest string (from mic)
+  const [autoString,      setAutoString]      = useState<number | null>(null)
+  const [detectedFreq,    setDetectedFreq]    = useState<number | null>(null)
+  const [isListening,     setIsListening]     = useState(false)
+  const [hasStarted,      setHasStarted]      = useState(false)  // true once mic started
+  const [micError,        setMicError]        = useState(false)
 
-  const tuning       = TUNINGS.find((t) => t.id === tuningId) ?? TUNINGS[0]
-  const activeString = selectedString !== null ? tuning.strings[selectedString] : null
+  // Exponential moving average for frequency smoothing
+  const freqEMA = useRef(0)
+
+  const tuning  = TUNINGS.find((t) => t.id === tuningId) ?? TUNINGS[0]
+  const s       = tuning.strings
 
   useEffect(() => { localStorage.setItem(TUNING_KEY, tuningId) }, [tuningId])
 
-  const handleStringPress = useCallback((index: number) => {
-    haptic(10)
-    playString(tuning.strings[index].freq, 2.6)
-    setSelected((prev) => (prev === index ? null : index))
-  }, [tuning])
-
+  // ── Start pitch detection ── must be called from a user gesture ──────
   const startListening = useCallback(async () => {
+    if (hasStarted) return
     setMicError(false)
     try {
       await startPitchDetection((result: PitchDetectionResult) => {
-        if (result.frequency && result.clarity > 0.62) {
-          freqSmoother.current = freqSmoother.current === 0
+        if (result.frequency && result.clarity >= CLARITY_MIN) {
+          // Fast EMA: 55% new reading → snappy needle
+          freqEMA.current = freqEMA.current === 0
             ? result.frequency
-            : freqSmoother.current * 0.78 + result.frequency * 0.22
-          setDetectedFreq(freqSmoother.current)
+            : freqEMA.current * (1 - SMOOTHER_FAST) + result.frequency * SMOOTHER_FAST
+
+          setDetectedFreq(freqEMA.current)
+
+          // Auto-detect closest string
+          setAutoString((prev) => {
+            const idx = tuning.strings.reduce((bestIdx, cand, i) =>
+              Math.abs(centsDifference(freqEMA.current, cand.freq)) <
+              Math.abs(centsDifference(freqEMA.current, tuning.strings[bestIdx].freq))
+                ? i : bestIdx,
+              0)
+            return idx !== prev ? idx : prev
+          })
         } else {
+          // Signal dropped: fade out gracefully after a short hold
           setDetectedFreq(null)
-          freqSmoother.current = 0
+          freqEMA.current = 0
         }
       })
       setIsListening(true)
+      setHasStarted(true)
     } catch {
       setMicError(true)
       setIsListening(false)
     }
+  }, [hasStarted, tuning])
+
+  // Stop everything on unmount or tuning change
+  useEffect(() => {
+    return () => { stopPitchDetection(); stopString() }
   }, [])
 
   useEffect(() => {
-    startListening()
-    return () => { stopPitchDetection(); stopString() }
-  }, [startListening])
+    stopString()
+    setSelectedString(null)
+    setAutoString(null)
+    setDetectedFreq(null)
+    freqEMA.current = 0
+  }, [tuningId])
 
-  useEffect(() => { stopString(); setSelected(null) }, [tuningId])
+  // ── String button handler — also starts mic on first tap ─────────────
+  const handleStringPress = useCallback(async (index: number) => {
+    haptic(10)
+    playString(s[index].freq, 2.6)
+    setSelectedString((prev) => (prev === index ? null : index))
+    // iOS: AudioContext must be started from a user gesture → do it here
+    if (!hasStarted) await startListening()
+  }, [s, hasStarted, startListening])
 
-  const closestString = detectedFreq
-    ? tuning.strings.reduce((best, cand) =>
-        Math.abs(centsDifference(detectedFreq, cand.freq)) <
-        Math.abs(centsDifference(detectedFreq, best.freq)) ? cand : best,
-        tuning.strings[0])
-    : activeString
-
-  const targetFreq   = closestString?.freq ?? null
-  const cents        = detectedFreq && targetFreq ? centsDifference(detectedFreq, targetFreq) : 0
-  const inTune       = Boolean(detectedFreq && targetFreq && Math.abs(cents) <= 5)
-  const detectedNote = detectedFreq ? frequencyToNote(detectedFreq) : null
+  // ── Derived tuning values ─────────────────────────────────────────────
+  // Active string: user-selected takes priority, fallback to auto-detected
+  const activeStringIdx = selectedString ?? autoString
+  const targetString    = activeStringIdx !== null ? s[activeStringIdx] : null
+  const targetFreq      = targetString?.freq ?? null
+  const cents           = detectedFreq && targetFreq ? centsDifference(detectedFreq, targetFreq) : 0
+  const inTune          = Boolean(detectedFreq && targetFreq && Math.abs(cents) <= IN_TUNE_CENTS)
+  const detectedNote    = detectedFreq ? frequencyToNote(detectedFreq) : null
 
   const status: TuneStatus =
     micError                       ? "idle"      :
-    selectedString === null        ? "idle"      :
-    !isListening || !detectedFreq  ? "listening" :
+    !hasStarted                    ? "idle"      :
+    !detectedFreq                  ? "listening" :
     inTune                         ? "intune"    :
-    cents < -5                     ? "flat"      :
+    cents < -IN_TUNE_CENTS         ? "flat"      :
                                      "sharp"
 
+  // Display note: show detected note when listening, else target string name
   const displayNote = detectedNote
     ? `${detectedNote.note}${detectedNote.octave}`
-    : activeString
-      ? `${activeString.name}${activeString.octave}`
+    : targetString
+      ? `${targetString.name}${targetString.octave}`
       : null
 
-  const s = tuning.strings
-
   return (
-    <div
-      style={{
-        display:       "flex",
-        flexDirection: "column",
-        height:        "100%",
-        background:    "var(--background)",
-        overflow:      "hidden",
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--background)", overflow: "hidden" }}>
+
       {/* ── Tuning preset ── */}
       <div style={{ padding: "14px 20px 0", flexShrink: 0 }}>
         <TuningPicker current={tuning} options={TUNINGS} onChange={setTuningId} />
@@ -499,22 +484,14 @@ export function ReferenceTuner() {
 
       {/* ── Note display ── */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 20px 2px", flexShrink: 0 }}>
-        <div
-          style={{
-            fontSize:           80,
-            fontWeight:         700,
-            letterSpacing:      "-3px",
-            lineHeight:         1,
-            color:              displayNote
-              ? (inTune && isListening ? "var(--success)" : "var(--foreground)")
-              : "rgba(60,60,67,0.18)",
-            transition:         "color 0.4s ease",
-            fontVariantNumeric: "tabular-nums",
-            minHeight:          80,
-            display:            "flex",
-            alignItems:         "center",
-          }}
-        >
+        <div style={{
+          fontSize: 80, fontWeight: 700, letterSpacing: "-3px", lineHeight: 1,
+          color: displayNote
+            ? (inTune && isListening ? "var(--success)" : "var(--foreground)")
+            : "rgba(60,60,67,0.18)",
+          transition: "color 0.4s ease", fontVariantNumeric: "tabular-nums",
+          minHeight: 80, display: "flex", alignItems: "center",
+        }}>
           {displayNote ?? "—"}
         </div>
         <div style={{ marginTop: 4 }}>
@@ -524,89 +501,50 @@ export function ReferenceTuner() {
 
       {/* ── Horizontal meter ── */}
       <div style={{ padding: "6px 24px 0", flexShrink: 0 }}>
-        <HorizontalMeter cents={cents} isActive={isListening && detectedFreq !== null} inTune={inTune} />
+        <HorizontalMeter
+          cents={cents}
+          isActive={isListening && detectedFreq !== null}
+          inTune={inTune}
+        />
         <div style={{ display: "flex", justifyContent: "space-between", padding: "0 14px" }}>
           <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500 }}>Flat</span>
           <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500 }}>Sharp</span>
         </div>
       </div>
 
-      {/* ── Headstock + string buttons ────────────────────────────────
-          Three-column layout: [left buttons] [headstock SVG] [right buttons]
-          Buttons are aligned to lever-key positions via TOP_PAD + BTN_GAP
-          computed from the fixed SVG dimensions. A visible gap is created
-          by the column spacing (gap: 16px on each side).
-          ────────────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          flex:            1,
-          display:         "flex",
-          alignItems:      "flex-start",
-          justifyContent:  "center",
-          minHeight:       0,
-          padding:         "6px 8px 0",
-          gap:             10,
-        }}
-      >
-        {/* Left column — C (top) and G (bottom) */}
-        <div
-          style={{
-            display:       "flex",
-            flexDirection: "column",
-            alignItems:    "center",
-            gap:           BTN_GAP,
-            paddingTop:    TOP_PAD,
-          }}
-        >
-          <StringBtn
-            name={s[1].name}
-            isSelected={selectedString === 1}
-            inTune={inTune} isListening={isListening}
-            onClick={() => handleStringPress(1)}
-          />
-          <StringBtn
-            name={s[0].name}
-            isSelected={selectedString === 0}
-            inTune={inTune} isListening={isListening}
-            onClick={() => handleStringPress(0)}
-          />
+      {/* ── Headstock + string buttons ─────────────────────────────────── */}
+      <div style={{
+        flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center",
+        minHeight: 0, padding: "6px 8px 0", gap: 10,
+      }}>
+        {/* Left column: C (top) G (bottom) */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: BTN_GAP, paddingTop: TOP_PAD }}>
+          <StringBtn name={s[1].name} isSelected={selectedString === 1} isAuto={selectedString === null && autoString === 1}
+            inTune={inTune} isListening={isListening} onClick={() => handleStringPress(1)} />
+          <StringBtn name={s[0].name} isSelected={selectedString === 0} isAuto={selectedString === null && autoString === 0}
+            inTune={inTune} isListening={isListening} onClick={() => handleStringPress(0)} />
         </div>
 
-        {/* Centre — fixed-size headstock illustration */}
+        {/* Centre: headstock illustration */}
         <div style={{ flexShrink: 0 }}>
           <MinimalHeadstock
             selectedString={selectedString}
+            autoString={autoString}
             inTune={inTune}
             isListening={isListening}
           />
         </div>
 
-        {/* Right column — E (top) and A (bottom) */}
-        <div
-          style={{
-            display:       "flex",
-            flexDirection: "column",
-            alignItems:    "center",
-            gap:           BTN_GAP,
-            paddingTop:    TOP_PAD,
-          }}
-        >
-          <StringBtn
-            name={s[2].name}
-            isSelected={selectedString === 2}
-            inTune={inTune} isListening={isListening}
-            onClick={() => handleStringPress(2)}
-          />
-          <StringBtn
-            name={s[3].name}
-            isSelected={selectedString === 3}
-            inTune={inTune} isListening={isListening}
-            onClick={() => handleStringPress(3)}
-          />
+        {/* Right column: E (top) A (bottom) */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: BTN_GAP, paddingTop: TOP_PAD }}>
+          <StringBtn name={s[2].name} isSelected={selectedString === 2} isAuto={selectedString === null && autoString === 2}
+            inTune={inTune} isListening={isListening} onClick={() => handleStringPress(2)} />
+          <StringBtn name={s[3].name} isSelected={selectedString === 3} isAuto={selectedString === null && autoString === 3}
+            inTune={inTune} isListening={isListening} onClick={() => handleStringPress(3)} />
         </div>
       </div>
 
-      {/* ── Mic error banner (only shown when mic access is denied) ── */}
+      {/* ── Mic error banner ── */}
       {micError && (
         <div style={{ padding: "0 16px calc(var(--safe-bottom) + 10px)", flexShrink: 0 }}>
           <div style={{
@@ -621,10 +559,27 @@ export function ReferenceTuner() {
             </div>
             <button onClick={startListening} style={{
               background: "var(--destructive)", color: "#FFFFFF", border: "none",
-              borderRadius: 8, padding: "5px 12px", fontSize: 13, fontWeight: 600,
-              cursor: "pointer", flexShrink: 0,
+              borderRadius: 8, padding: "5px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0,
             }}>Allow</button>
           </div>
+        </div>
+      )}
+
+      {/* ── Tap-to-start hint (first time only) ── */}
+      {!hasStarted && !micError && (
+        <div style={{ padding: "0 16px calc(var(--safe-bottom) + 10px)", flexShrink: 0 }}>
+          <button
+            onClick={startListening}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+              gap: 10, padding: "14px 16px", borderRadius: 14, border: "none", cursor: "pointer",
+              background: "var(--primary)", color: "#FFFFFF",
+              boxShadow: "0 2px 12px rgba(0,122,255,0.3)",
+            }}
+          >
+            <AudioLines size={20} strokeWidth={2} />
+            <span style={{ fontSize: 15, fontWeight: 600 }}>Start Tuner</span>
+          </button>
         </div>
       )}
 

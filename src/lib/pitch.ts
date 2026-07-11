@@ -1,180 +1,211 @@
-// ── Pitch detection via autocorrelation ──────────────────────────────
-// Based on the well-known autocorrelation algorithm used in web tuner apps.
-// Returns the detected frequency in Hz, or null if no clear pitch is found.
+// ── Pitch detection — windowed YIN autocorrelation ───────────────────
+//
+// Improvements over the original:
+//  • 8192-sample buffer for better low-frequency resolution
+//  • Hann window applied before analysis (reduces spectral leakage)
+//  • YIN threshold raised from 0.12 → 0.15 (more detections)
+//  • Parabolic interpolation for sub-sample accuracy
+//  • RMS silence gate: skip frames with too little energy
+//  • Clarity expressed as 1 – normalised difference at best tau
+//
+// iOS compatibility:
+//  • startPitchDetection() must be called from a user-gesture handler
+//    (e.g. a button tap) so that new AudioContext() / resume() succeeds.
+//    The ReferenceTuner triggers this on first string-button press.
 
 export interface PitchDetectionResult {
   frequency: number | null
-  clarity: number // 0-1, how confident the detection is
+  clarity:   number          // 0–1
 }
 
-let audioContext: AudioContext | null = null
-let mediaStream: MediaStream | null = null
-let analyser: AnalyserNode | null = null
-let sourceNode: MediaStreamAudioSourceNode | null = null
-let animationFrameId: number | null = null
-let buffer: Float32Array<ArrayBuffer> | null = null
+let audioContext:  AudioContext | null = null
+let mediaStream:   MediaStream  | null = null
+let analyser:      AnalyserNode | null = null
+let sourceNode:    MediaStreamAudioSourceNode | null = null
+let animationId:   number | null = null
+let timeDomainBuf: Float32Array<ArrayBuffer> | null = null
 
-const BUFFER_SIZE = 4096
+const BUFFER_SIZE   = 8192    // larger → better low-freq resolution
+const RMS_THRESHOLD = 0.008   // silence gate
+const YIN_THRESHOLD = 0.15    // slightly permissive for real instruments
 
-export async function startPitchDetection(
-  onPitch: (result: PitchDetectionResult) => void,
-): Promise<void> {
-  if (animationFrameId !== null) return // already running
-
-  audioContext = new AudioContext()
-  if (audioContext.state === "suspended") await audioContext.resume()
-
-  mediaStream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: false,
-      noiseSuppression: false,
-      autoGainControl: false,
-    },
-  })
-
-  sourceNode = audioContext.createMediaStreamSource(mediaStream)
-  analyser = audioContext.createAnalyser()
-  analyser.fftSize = BUFFER_SIZE
-  buffer = new Float32Array(analyser.fftSize)
-
-  sourceNode.connect(analyser)
-
-  const detect = () => {
-    if (!analyser || !buffer) return
-
-    analyser.getFloatTimeDomainData(buffer)
-    const result = detectPitch(buffer, audioContext!.sampleRate)
-    onPitch(result)
-    animationFrameId = requestAnimationFrame(detect)
+// ── Hann window ──────────────────────────────────────────────────────
+function applyHannWindow(input: Float32Array): Float32Array {
+  const out = new Float32Array(input.length)
+  const N   = input.length
+  for (let i = 0; i < N; i++) {
+    out[i] = input[i] * 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)))
   }
-
-  detect()
+  return out
 }
 
-export function stopPitchDetection(): void {
-  if (animationFrameId !== null) {
-    cancelAnimationFrame(animationFrameId)
-    animationFrameId = null
-  }
-  if (sourceNode) {
-    sourceNode.disconnect()
-    sourceNode = null
-  }
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((t) => t.stop())
-    mediaStream = null
-  }
-  if (audioContext) {
-    audioContext.close()
-    audioContext = null
-  }
-  analyser = null
-  buffer = null
-}
-
-function detectPitch(buf: Float32Array, sampleRate: number): PitchDetectionResult {
-  const SIZE = buf.length
-
-  // Compute RMS to check if there's enough signal
-  let rms = 0
-  for (let i = 0; i < SIZE; i++) {
-    rms += buf[i] * buf[i]
-  }
-  rms = Math.sqrt(rms / SIZE)
-
-  if (rms < 0.01) {
-    return { frequency: null, clarity: 0 }
-  }
-
-  const yinResult = detectPitchYIN(buf, sampleRate)
-  if (!yinResult) {
-    return { frequency: null, clarity: 0 }
-  }
-
-  return {
-    frequency: yinResult.frequency,
-    clarity: yinResult.clarity,
-  }
-}
-
-function detectPitchYIN(
-  samples: Float32Array,
-  sampleRate: number,
-): { frequency: number; clarity: number } | null {
-  const minFrequency = 60
-  const maxFrequency = 1000
-  const maxTau = Math.floor(sampleRate / minFrequency)
-  const minTau = Math.floor(sampleRate / maxFrequency)
-  const yinBuffer = new Float32Array(maxTau + 1)
-
+// ── YIN difference function ──────────────────────────────────────────
+function yinDiff(buf: Float32Array, maxTau: number): Float32Array {
+  const yin = new Float32Array(maxTau + 1)
   for (let tau = 1; tau <= maxTau; tau++) {
     let sum = 0
-    const limit = samples.length - tau
+    const limit = buf.length - tau
     for (let i = 0; i < limit; i++) {
-      const delta = samples[i] - samples[i + tau]
-      sum += delta * delta
+      const d = buf[i] - buf[i + tau]
+      sum += d * d
     }
-    yinBuffer[tau] = sum
+    yin[tau] = sum
   }
+  return yin
+}
 
-  let runningSum = 0
-  yinBuffer[0] = 1
-  for (let tau = 1; tau <= maxTau; tau++) {
-    runningSum += yinBuffer[tau]
-    yinBuffer[tau] = runningSum === 0 ? 1 : (yinBuffer[tau] * tau) / runningSum
+// ── Cumulative mean normalised difference ────────────────────────────
+function cmndf(yin: Float32Array): void {
+  yin[0] = 1
+  let running = 0
+  for (let tau = 1; tau < yin.length; tau++) {
+    running += yin[tau]
+    yin[tau] = running === 0 ? 1 : (yin[tau] * tau) / running
   }
+}
 
-  const threshold = 0.12
-  let tauEstimate = -1
+// ── Parabolic interpolation for sub-sample refinement ───────────────
+function parabolicInterp(yin: Float32Array, tau: number): number {
+  const prev = tau > 1                   ? yin[tau - 1] : yin[tau]
+  const curr = yin[tau]
+  const next = tau + 1 < yin.length     ? yin[tau + 1] : curr
+  const denom = 2 * (2 * curr - prev - next)
+  return denom !== 0 ? tau + (next - prev) / denom : tau
+}
+
+// ── Core pitch detection ─────────────────────────────────────────────
+function detectPitch(rawBuf: Float32Array, sampleRate: number): PitchDetectionResult {
+  // Silence gate
+  let rms = 0
+  for (let i = 0; i < rawBuf.length; i++) rms += rawBuf[i] * rawBuf[i]
+  rms = Math.sqrt(rms / rawBuf.length)
+  if (rms < RMS_THRESHOLD) return { frequency: null, clarity: 0 }
+
+  // Windowing
+  const buf = applyHannWindow(rawBuf)
+
+  // Ukulele frequency range: 196 Hz (low G3) – 880 Hz (A5)
+  // We use a slightly wider range for robustness
+  const minFreq = 150
+  const maxFreq = 1000
+  const maxTau  = Math.floor(sampleRate / minFreq)
+  const minTau  = Math.floor(sampleRate / maxFreq)
+
+  const yin = yinDiff(buf, maxTau)
+  cmndf(yin)
+
+  // Find first tau below threshold (local minimum)
+  let tauEst = -1
   for (let tau = minTau; tau <= maxTau; tau++) {
-    if (yinBuffer[tau] < threshold) {
-      while (tau + 1 <= maxTau && yinBuffer[tau + 1] < yinBuffer[tau]) {
-        tau++
-      }
-      tauEstimate = tau
+    if (yin[tau] < YIN_THRESHOLD) {
+      // Walk forward to true local minimum
+      while (tau + 1 <= maxTau && yin[tau + 1] < yin[tau]) tau++
+      tauEst = tau
       break
     }
   }
 
-  if (tauEstimate < 0) return null
+  if (tauEst < 0) {
+    // No tau below strict threshold — try absolute minimum as fallback
+    let minVal = Infinity, minTauFallback = -1
+    for (let tau = minTau; tau <= maxTau; tau++) {
+      if (yin[tau] < minVal) { minVal = yin[tau]; minTauFallback = tau }
+    }
+    if (minVal > 0.35 || minTauFallback < 0) return { frequency: null, clarity: 0 }
+    tauEst = minTauFallback
+  }
 
-  const prev = tauEstimate > 1 ? yinBuffer[tauEstimate - 1] : yinBuffer[tauEstimate]
-  const curr = yinBuffer[tauEstimate]
-  const next = tauEstimate + 1 <= maxTau ? yinBuffer[tauEstimate + 1] : curr
-  const denominator = 2 * (2 * curr - prev - next)
-  const betterTau = denominator !== 0 ? tauEstimate + (next - prev) / denominator : tauEstimate
-  const frequency = sampleRate / betterTau
-  const clarity = Math.max(0, Math.min(1, 1 - curr))
+  const refinedTau = parabolicInterp(yin, tauEst)
+  const frequency  = sampleRate / refinedTau
+  const clarity    = Math.max(0, Math.min(1, 1 - yin[tauEst]))
 
-  if (!Number.isFinite(frequency) || frequency < minFrequency || frequency > maxFrequency) {
-    return null
+  if (!Number.isFinite(frequency) || frequency < minFreq || frequency > maxFreq) {
+    return { frequency: null, clarity: 0 }
   }
 
   return { frequency, clarity }
 }
 
-// ── Convert frequency to note name + cents offset ─────────────────────
-export function frequencyToNote(frequency: number): { note: string; octave: number; cents: number } {
-  const A4 = 440
-  const semitones = 12 * Math.log2(frequency / A4)
-  const roundedSemitones = Math.round(semitones)
-  const cents = Math.round((semitones - roundedSemitones) * 100)
+// ── Public API ───────────────────────────────────────────────────────
 
-  const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+/**
+ * Start pitch detection.
+ *
+ * MUST be called from a user-gesture handler on iOS (tap, click, etc.).
+ * Internally creates a new AudioContext and requests microphone access.
+ */
+export async function startPitchDetection(
+  onPitch: (result: PitchDetectionResult) => void,
+): Promise<void> {
+  if (animationId !== null) return     // already running
 
-  // MIDI note number for A4 = 69
-  const midiNote = 69 + roundedSemitones
-  const noteIndex = ((midiNote % 12) + 12) % 12
-  const octave = Math.floor(midiNote / 12) - 1
+  // Create AudioContext synchronously — must happen in user-gesture call stack
+  audioContext = new AudioContext()
+  // resume() here is within the user-gesture call chain → works on iOS
+  if (audioContext.state === "suspended") {
+    try { audioContext.resume() } catch {}
+  }
 
+  // Request mic — show system permission dialog if needed
+  mediaStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl:  false,
+      // iOS sometimes ignores these, but setting them signals intent
+      sampleRate:       { ideal: 44100 },
+    },
+  })
+
+  // After getUserMedia resolves, resume again in case context is still suspended
+  if (audioContext.state === "suspended") {
+    try { await audioContext.resume() } catch {}
+  }
+
+  sourceNode = audioContext.createMediaStreamSource(mediaStream)
+  analyser   = audioContext.createAnalyser()
+  analyser.fftSize          = BUFFER_SIZE
+  analyser.smoothingTimeConstant = 0   // raw frames — we handle smoothing ourselves
+  timeDomainBuf = new Float32Array(analyser.fftSize)
+
+  sourceNode.connect(analyser)
+
+  const loop = () => {
+    if (!analyser || !timeDomainBuf) return
+    analyser.getFloatTimeDomainData(timeDomainBuf)
+    onPitch(detectPitch(timeDomainBuf, audioContext!.sampleRate))
+    animationId = requestAnimationFrame(loop)
+  }
+  loop()
+}
+
+export function stopPitchDetection(): void {
+  if (animationId !== null) { cancelAnimationFrame(animationId); animationId = null }
+  sourceNode?.disconnect();  sourceNode  = null
+  mediaStream?.getTracks().forEach((t) => t.stop()); mediaStream = null
+  audioContext?.close();     audioContext = null
+  analyser      = null
+  timeDomainBuf = null
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+/** Convert raw frequency → note name + octave */
+export function frequencyToNote(freq: number): { note: string; octave: number; cents: number } {
+  const A4        = 440
+  const semitones = 12 * Math.log2(freq / A4)
+  const rounded   = Math.round(semitones)
+  const cents     = Math.round((semitones - rounded) * 100)
+  const noteNames = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+  const midi      = 69 + rounded
   return {
-    note: noteNames[noteIndex],
-    octave,
+    note:   noteNames[((midi % 12) + 12) % 12],
+    octave: Math.floor(midi / 12) - 1,
     cents,
   }
 }
 
-// ── Calculate cents difference between detected and target ────────────
+/** Cents difference between detected and target frequency */
 export function centsDifference(detected: number, target: number): number {
   return Math.round(1200 * Math.log2(detected / target))
 }
