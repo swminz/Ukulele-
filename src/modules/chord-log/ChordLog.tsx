@@ -222,6 +222,13 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
 
   const handleDeleted = async () => { await load(); setViewSong(null) }
 
+  const handleDelete = async (song: Song) => {
+    haptic([10, 30, 10])
+    await deleteSong(song.id)
+    await load()
+    if (viewSong?.id === song.id) setViewSong(null)
+  }
+
   const handleToggleFavorite = async (song: Song) => {
     const updated = { ...song, favorite: !song.favorite, modifiedAt: Date.now() }
     await saveSong(updated)
@@ -314,6 +321,7 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
                           song={song}
                           onOpen={() => setViewSong(song)}
                           onToggleFavorite={() => handleToggleFavorite(song)}
+                          onDelete={() => handleDelete(song)}
                         />
                       ) : (
                         <PDFUploadCard
@@ -321,6 +329,7 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
                           song={song}
                           onOpen={() => setViewSong(song)}
                           onToggleFavorite={() => handleToggleFavorite(song)}
+                          onDelete={() => handleDelete(song)}
                         />
                       )
                     )}
@@ -339,6 +348,7 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
                         song={song}
                         onOpen={() => setViewSong(song)}
                         onToggleFavorite={() => handleToggleFavorite(song)}
+                        onDelete={() => handleDelete(song)}
                       />
                     ))}
                   </div>
@@ -358,6 +368,7 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
                         song={song}
                         onOpen={() => setViewSong(song)}
                         onToggleFavorite={() => handleToggleFavorite(song)}
+                        onDelete={() => handleDelete(song)}
                       />
                     ))}
                   </div>

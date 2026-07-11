@@ -263,7 +263,7 @@
   position:    relative;
 }
 
-/* hairline separator between rows */
+/* hairline separator between rows (direct adjacency) */
 .grouped-row + .grouped-row::before {
   content:  "";
   position: absolute;
@@ -271,6 +271,23 @@
   left:     16px;
   right:    0;
   height:   1px;
+  background: var(--separator);
+}
+
+/* ── Swipe-to-delete row wrapper ─────────────────────────────────────── */
+.swipe-row {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Separator still works between swipe-row wrappers */
+.swipe-row + .swipe-row .grouped-row::before {
+  content:    "";
+  position:   absolute;
+  top:        0;
+  left:       16px;
+  right:      0;
+  height:     1px;
   background: var(--separator);
 }
 

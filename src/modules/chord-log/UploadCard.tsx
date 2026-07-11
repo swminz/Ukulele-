@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import type { Song } from "@/types"
 import { Play, Pause, FileText, Music2, ChevronRight, Heart } from "lucide-react"
+import { SwipeableRow } from "./SwipeableRow"
 
 function formatDuration(s: number) {
   if (!isFinite(s)) return "--:--"
@@ -19,9 +20,10 @@ interface AudioCardProps {
   song: Song
   onOpen: () => void
   onToggleFavorite: () => void
+  onDelete: () => void
 }
 
-export function AudioUploadCard({ song, onOpen, onToggleFavorite }: AudioCardProps) {
+export function AudioUploadCard({ song, onOpen, onToggleFavorite, onDelete }: AudioCardProps) {
   const audio    = song.audio!
   const [playing,  setPlaying]  = useState(false)
   const [progress, setProgress] = useState(0)       // 0-1
@@ -65,6 +67,7 @@ export function AudioUploadCard({ song, onOpen, onToggleFavorite }: AudioCardPro
   const ext = audio.filename.split(".").pop()?.toUpperCase() ?? "AUDIO"
 
   return (
+    <SwipeableRow onDelete={onDelete}>
     <div
       className="grouped-row"
       style={{ cursor: "pointer", padding: "12px 16px 12px 12px", gap: 0, flexDirection: "column", alignItems: "stretch" }}
@@ -127,6 +130,7 @@ export function AudioUploadCard({ song, onOpen, onToggleFavorite }: AudioCardPro
         }} />
       </div>
     </div>
+    </SwipeableRow>
   )
 }
 
@@ -135,13 +139,15 @@ interface PDFCardProps {
   song: Song
   onOpen: () => void
   onToggleFavorite: () => void
+  onDelete: () => void
 }
 
-export function PDFUploadCard({ song, onOpen, onToggleFavorite }: PDFCardProps) {
+export function PDFUploadCard({ song, onOpen, onToggleFavorite, onDelete }: PDFCardProps) {
   const pdf = song.pdf!
   const ext = pdf.filename.split(".").pop()?.toUpperCase() ?? "PDF"
 
   return (
+    <SwipeableRow onDelete={onDelete}>
     <div
       className="grouped-row"
       role="button"
@@ -192,5 +198,6 @@ export function PDFUploadCard({ song, onOpen, onToggleFavorite }: PDFCardProps) 
       <Music2 size={13} style={{ color: "var(--text-tertiary)", flexShrink: 0, opacity: 0.5, marginRight: 6 }} />
       <ChevronRight size={16} strokeWidth={1.8} style={{ color: "var(--text-tertiary)", flexShrink: 0, opacity: 0.45 }} />
     </div>
+    </SwipeableRow>
   )
 }

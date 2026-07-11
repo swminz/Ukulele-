@@ -1,10 +1,12 @@
 import type { Song } from "@/types"
 import { Heart, ChevronRight, FileText } from "lucide-react"
+import { SwipeableRow } from "./SwipeableRow"
 
 interface Props {
   song: Song
   onOpen: () => void
   onToggleFavorite: () => void
+  onDelete: () => void
 }
 
 function relativeDate(ts: number) {
@@ -16,12 +18,13 @@ function relativeDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
-export function SongCard({ song, onOpen, onToggleFavorite }: Props) {
+export function SongCard({ song, onOpen, onToggleFavorite, onDelete }: Props) {
   const hasPDF   = Boolean(song.pdf)
   const artist   = song.artist?.trim()
   const hasMeta  = artist || song.key || song.capo
 
   return (
+    <SwipeableRow onDelete={onDelete}>
     <div
       className="grouped-row"
       role="button"
@@ -114,5 +117,6 @@ export function SongCard({ song, onOpen, onToggleFavorite }: Props) {
         style={{ color: "var(--text-tertiary)", flexShrink: 0, opacity: 0.45 }}
       />
     </div>
+    </SwipeableRow>
   )
 }
