@@ -607,7 +607,7 @@ export function ReferenceTuner() {
       </div>
 
       {/* ── Instruction / mic error card ── */}
-      <div style={{ padding: "8px 16px 16px", flexShrink: 0 }}>
+      <div style={{ padding: "8px 16px calc(var(--safe-bottom) + 8px)", flexShrink: 0 }}>
         {micError ? (
           <div style={{
             background: "var(--card)", borderRadius: 14, padding: "14px 16px",

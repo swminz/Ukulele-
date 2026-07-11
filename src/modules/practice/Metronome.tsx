@@ -495,7 +495,7 @@ export function Metronome() {
       </div>
 
       {/* ── Bottom info card ──────────────────────────────────────────── */}
-      <div style={{ padding: "12px 16px 20px", flexShrink: 0 }}>
+      <div style={{ padding: "12px 16px calc(var(--safe-bottom) + 12px)", flexShrink: 0 }}>
         <div
           style={{
             background:   "var(--card)",

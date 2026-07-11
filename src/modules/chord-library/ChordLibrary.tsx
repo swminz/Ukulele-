@@ -246,7 +246,7 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
       </div>
 
       {/* Grid */}
-      <div className="scroll-content" style={{ flex: 1, overflowY: "auto", padding: "0 16px 48px" }}>
+      <div className="scroll-content" style={{ flex: 1, overflowY: "auto", padding: "0 16px calc(var(--safe-bottom) + 32px)" }}>
         {filtered.length === 0 ? (
           <div style={{ paddingTop: 64, textAlign: "center" }}>
             <p style={{ fontSize: 17, color: "var(--text-tertiary)" }}>

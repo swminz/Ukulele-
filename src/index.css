@@ -154,6 +154,18 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   SAFE-AREA CUSTOM PROPERTIES
+   CSS variables that mirror iOS/Android env() values so they can be
+   referenced in calc() expressions across the codebase.
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,   0px);
+  --safe-right:  env(safe-area-inset-right,  0px);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    APP SHELL
    ══════════════════════════════════════════════════════════════════════ */
 .app-shell {
@@ -182,7 +194,8 @@
   backdrop-filter:        saturate(180%) blur(20px);
   -webkit-backdrop-filter:saturate(180%) blur(20px);
   border-top:             1px solid var(--separator);
-  padding-bottom:         env(safe-area-inset-bottom);
+  /* Reserve space below buttons for the home-indicator safe zone */
+  padding-bottom:         var(--safe-bottom);
 }
 
 .dark .bottom-nav {
@@ -193,6 +206,19 @@
 .bottom-nav button {
   outline:                    none;
   -webkit-tap-highlight-color:transparent;
+}
+
+/* ── Safe-area-aware scroll padding ─────────────────────────────── */
+/* Ensures the last item scrolls clear of the home-indicator stripe
+   when a scrollable area is inside a fixed full-screen overlay. */
+.scroll-safe-bottom {
+  padding-bottom: calc(var(--safe-bottom) + 40px);
+}
+
+/* Fixed-overlay sheets that need content to start below the
+   Dynamic Island / status bar */
+.sheet-top-pad {
+  padding-top: var(--safe-top);
 }
 
 /* ══════════════════════════════════════════════════════════════════════

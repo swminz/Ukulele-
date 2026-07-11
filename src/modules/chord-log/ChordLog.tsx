@@ -168,7 +168,7 @@ export function ChordLog({ addTrigger }: Props) {
         {/* ── List ── */}
         <div
           className="scroll-content"
-          style={{ flex: 1, overflowY: "auto", padding: "0 16px 48px" }}
+          style={{ flex: 1, overflowY: "auto", padding: "0 16px calc(var(--safe-bottom) + 32px)" }}
         >
           {songs.length === 0 ? (
             <div

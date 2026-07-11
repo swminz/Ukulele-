@@ -60,10 +60,10 @@ export default function App() {
       <header
         className="ios-header shrink-0 flex items-center justify-between"
         style={{
-          paddingTop:    "calc(env(safe-area-inset-top) + 10px)",
-          paddingBottom: 12,
-          paddingLeft:   20,
-          paddingRight:  16,
+        paddingTop:    "calc(env(safe-area-inset-top) + 4px)",
+        paddingBottom: 8,
+        paddingLeft:   20,
+        paddingRight:  16,
         }}
       >
         <h1
@@ -124,7 +124,7 @@ export default function App() {
         {tab === "settings" && (
           <div
             className="scroll-content"
-            style={{ height: "100%", overflowY: "auto", paddingTop: 8 }}
+            style={{ height: "100%", overflowY: "auto", paddingTop: 8, paddingBottom: "calc(var(--safe-bottom) + 24px)" }}
           >
             <Settings />
           </div>

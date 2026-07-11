@@ -101,7 +101,7 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onDup
         display: "flex",
         flexDirection: "column",
         background: "var(--background)",
-        paddingTop: "env(safe-area-inset-top)",
+        paddingTop: "var(--safe-top)",
       }}
     >
       {/* ── Navigation bar ── */}
@@ -226,7 +226,7 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onDup
             </button>
           </div>
 
-          <div ref={contentRef} className="scroll-content" style={{ flex: 1, overflowY: "auto", padding: "20px 20px 40px" }}>
+          <div ref={contentRef} className="scroll-content" style={{ flex: 1, overflowY: "auto", padding: "20px 20px calc(var(--safe-bottom) + 32px)" }}>
             {hasChords ? (
               <pre className="chord-editor" style={{ fontSize: `${fontSize}px`, color: "var(--foreground)" }}>
                 {song.content}
@@ -283,7 +283,7 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onDup
 
       {/* ══ Info ══ */}
       {segment === "info" && (
-        <div className="scroll-content" style={{ flex: 1, overflowY: "auto", padding: "20px 16px 40px" }}>
+        <div className="scroll-content" style={{ flex: 1, overflowY: "auto", padding: "20px 16px calc(var(--safe-bottom) + 32px)" }}>
           {/* Metadata rows */}
           {(() => {
             const rows = [

@@ -103,13 +103,13 @@ export function SongEditor({ song, isNew, onSave, onCancel }: Props) {
       <div
         className="modal-slide-up"
         style={{
-          position:      "fixed",
-          inset:         0,
-          zIndex:        50,
-          display:       "flex",
-          flexDirection: "column",
-          background:    "var(--background)",
-          paddingTop:    "env(safe-area-inset-top)",
+        position:      "fixed",
+        inset:         0,
+        zIndex:        50,
+        display:       "flex",
+        flexDirection: "column",
+        background:    "var(--background)",
+        paddingTop:    "var(--safe-top)",
         }}
       >
         {/* ── Navigation bar ── */}
@@ -164,7 +164,7 @@ export function SongEditor({ song, isNew, onSave, onCancel }: Props) {
         </div>
 
         {/* ── Form ── */}
-        <div className="scroll-content" style={{ flex: 1, overflowY: "auto", padding: "24px 16px 48px" }}>
+        <div className="scroll-content" style={{ flex: 1, overflowY: "auto", padding: "24px 16px calc(var(--safe-bottom) + 48px)" }}>
 
           <Field label="TITLE">
             <input
