@@ -272,6 +272,11 @@ export function Metronome() {
       {/* ── BPM hero + slider ────────────────────────────────────────── */}
       <div style={{ padding: "8px 20px 0", flexShrink: 0 }}>
 
+        {/* Section label */}
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 6 }}>
+          Tempo
+        </p>
+
         {/* BPM row */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
@@ -339,39 +344,41 @@ export function Metronome() {
         </div>
       </div>
 
-      {/* ── Time Sig + Beat Accent — single compact row ───────────────── */}
-      <div style={{ padding: "8px 20px 0", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-
-        {/* Time sig pill — tap to cycle */}
+      {/* ── Time Signature — full-width row ──────────────────────────── */}
+      <div style={{ padding: "10px 20px 0", flexShrink: 0 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 6 }}>
+          Time Signature
+        </p>
         <button
           onClick={handleTimeSig}
           aria-label={`Time signature ${timeSig}/4 — tap to cycle`}
           style={{
-            display:      "flex",
-            alignItems:   "center",
-            gap:          3,
-            background:   "var(--card)",
-            border:       "none",
-            borderRadius: 10,
-            padding:      "6px 12px",
-            cursor:       "pointer",
-            boxShadow:    "0 0 0 1px rgba(60,60,67,0.10), 0 1px 3px rgba(0,0,0,0.05)",
-            flexShrink:   0,
+            display:       "flex",
+            alignItems:    "center",
+            justifyContent:"space-between",
+            width:         "100%",
+            background:    "var(--card)",
+            border:        "none",
+            borderRadius:  12,
+            padding:       "10px 16px",
+            cursor:        "pointer",
+            boxShadow:     "0 0 0 1px rgba(60,60,67,0.10), 0 1px 3px rgba(0,0,0,0.05)",
             WebkitTapHighlightColor: "transparent",
           }}
         >
-          <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", fontVariantNumeric: "tabular-nums", color: "var(--foreground)" }}>
-            {timeSig}
+          <span style={{ fontSize: 17, fontWeight: 500, color: "var(--foreground)" }}>
+            {timeSig} / 4
           </span>
-          <span style={{ fontSize: 18, fontWeight: 300, color: "var(--text-tertiary)" }}>/</span>
-          <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", fontVariantNumeric: "tabular-nums", color: "var(--foreground)" }}>
-            4
-          </span>
-          <ChevronRight size={12} strokeWidth={2} style={{ color: "var(--text-tertiary)", opacity: 0.5, marginLeft: 2 }} />
+          <ChevronRight size={16} strokeWidth={2} style={{ color: "var(--text-tertiary)", opacity: 0.5 }} />
         </button>
+      </div>
 
-        {/* Beat accent dots */}
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      {/* ── Beat Accent — full-width row ──────────────────────────────── */}
+      <div style={{ padding: "10px 20px 0", flexShrink: 0 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 6 }}>
+          Beat Accent
+        </p>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {Array.from({ length: timeSig }, (_, i) => i + 1).map((n) => {
             const active = n === accentBeat
             const isBeat = beat === n
@@ -382,9 +389,9 @@ export function Metronome() {
                 aria-label={`Accent beat ${n}`}
                 aria-pressed={active}
                 style={{
-                  width:        34,
-                  height:       34,
-                  borderRadius: "50%",
+                  flex:         1,
+                  height:       40,
+                  borderRadius: 10,
                   border:       active ? "none" : "1.5px solid rgba(60,60,67,0.15)",
                   background:   active
                     ? "var(--primary)"
@@ -396,9 +403,8 @@ export function Metronome() {
                   fontWeight:   600,
                   cursor:       "pointer",
                   transition:   "background 0.12s ease, transform 0.06s ease",
-                  transform:    isBeat ? "scale(1.14)" : "scale(1)",
+                  transform:    isBeat ? "scale(1.05)" : "scale(1)",
                   boxShadow:    active ? "0 2px 6px rgba(0,122,255,0.28)" : "0 1px 3px rgba(0,0,0,0.05)",
-                  flexShrink:   0,
                   WebkitTapHighlightColor: "transparent",
                 }}
               >
