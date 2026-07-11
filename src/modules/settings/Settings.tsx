@@ -268,6 +268,14 @@ export function Settings() {
             All data is stored locally on your device. No accounts, no cloud, no internet required.
           </p>
         </div>
+        <div className="grouped-row" style={{ justifyContent: "space-between" }}>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)", lineHeight: "18px" }}>
+            Developed by
+          </p>
+          <p style={{ fontSize: 13, fontWeight: 500, color: "var(--foreground)", letterSpacing: "-0.1px" }}>
+            Swati Minz
+          </p>
+        </div>
       </Section>
 
     </div>

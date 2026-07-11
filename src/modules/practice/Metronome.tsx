@@ -157,16 +157,20 @@ function TempoWheel({ bpm, running, beat, onBpmChange, onToggle }: WheelProps) {
       >
         <circle cx={CX} cy={CY} r={56} fill="transparent" />
         {running ? (
-          /* Stop square */
+          /* Stop — same visual footprint as play; rx=2 gives a subtle corner */
           <rect
-            x={CX - 12} y={CY - 18} width={24} height={24} rx={4}
+            x={CX - 11} y={CY - 18} width={22} height={22} rx={2}
             fill="var(--primary)"
           />
         ) : (
-          /* Play triangle — shifted up slightly to make room for label */
+          /* Play — rounded triangle; strokeWidth=6 + round join ≈ 2 px corner radius feel */
           <path
             d={`M ${CX - 9},${CY - 19} L ${CX + 15},${CY - 6} L ${CX - 9},${CY + 7} Z`}
             fill="var(--primary)"
+            stroke="var(--primary)"
+            strokeWidth={6}
+            strokeLinejoin="round"
+            strokeLinecap="round"
           />
         )}
         {/* Subtle "Play" / "Stop" hint label */}
@@ -269,7 +273,6 @@ export function Metronome() {
     return () => { rec.onend = null; rec.stop() }
   }, [])
 
-  const pct   = ((bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)) * 100
   const label = tempoLabel(bpm)
 
   return (
@@ -339,22 +342,7 @@ export function Metronome() {
           >+</button>
         </div>
 
-        {/* Slider */}
-        <div style={{ marginTop: 8 }}>
-          <input
-            type="range" min={MIN_BPM} max={MAX_BPM} value={bpm}
-            onChange={(e) => setBpm(Number(e.target.value))}
-            aria-label="Tempo"
-            style={{
-              width: "100%",
-              background: `linear-gradient(to right, var(--primary) ${pct}%, rgba(120,120,128,0.18) 0%)`,
-            }}
-          />
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 1 }}>
-            <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{MIN_BPM}</span>
-            <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{MAX_BPM}</span>
-          </div>
-        </div>
+        {/* Slider hidden — BPM controlled via wheel drag and +/- buttons */}
       </div>
 
       {/* ── Time Signature — full-width row ──────────────────────────── */}
@@ -388,7 +376,7 @@ export function Metronome() {
       </div>
 
       {/* ── Beat Accent — full-width row ──────────────────────────────── */}
-      <div style={{ padding: "10px 20px 0", flexShrink: 0 }}>
+      <div style={{ padding: "10px 20px 16px", flexShrink: 0 }}>
         <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 6 }}>
           Beat Accent
         </p>

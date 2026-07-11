@@ -1,196 +1,285 @@
-// ── Pitch detection — windowed YIN autocorrelation ───────────────────
+// ── Pitch detection — McLeod Pitch Method (MPM) ──────────────────────
 //
-// Improvements over the original:
-//  • 8192-sample buffer for better low-frequency resolution
-//  • Hann window applied before analysis (reduces spectral leakage)
-//  • YIN threshold raised from 0.12 → 0.15 (more detections)
-//  • Parabolic interpolation for sub-sample accuracy
-//  • RMS silence gate: skip frames with too little energy
-//  • Clarity expressed as 1 – normalised difference at best tau
+// Upgraded from YIN to MPM for improved accuracy on real instruments:
 //
-// iOS compatibility:
-//  • startPitchDetection() must be called from a user-gesture handler
-//    (e.g. a button tap) so that new AudioContext() / resume() succeeds.
-//    The ReferenceTuner triggers this on first string-button press.
+//  ALGORITHM  McLeod Pitch Method (MPM) — "A smarter way to find pitch"
+//             McLeod & Wyvill, 2005.
+//  KEY STEPS  1. Apply Hann window to reduce spectral leakage
+//             2. Compute Normalised Square Difference Function (NSDF)
+//             3. Find key maxima (highest point in each positive region)
+//             4. Select the first maximum above 93 % of the global max
+//             5. Parabolic interpolation for sub-sample precision
+//             6. Sub-harmonic validation to eliminate octave errors
+//
+//  MPM vs YIN • NSDF is frequency-independent → threshold works uniformly
+//             • Key-maxima selection avoids the YIN octave-doubling artifact
+//             • Better at detecting C4 (261 Hz) cleanly on uke
+//
+//  iOS compat • startPitchDetection() MUST be called from a user gesture so
+//               AudioContext.resume() / getUserMedia succeed on Safari.
 
 export interface PitchDetectionResult {
   frequency: number | null
-  clarity:   number          // 0–1
+  clarity:   number           // 0–1 (MPM peak value)
 }
 
-let audioContext:  AudioContext | null = null
-let mediaStream:   MediaStream  | null = null
-let analyser:      AnalyserNode | null = null
-let sourceNode:    MediaStreamAudioSourceNode | null = null
-let animationId:   number | null = null
+// ── Module-level Web Audio state ─────────────────────────────────────
+let audioCtx:    AudioContext | null = null
+let mediaStream: MediaStream  | null = null
+let analyser:    AnalyserNode | null = null
+let sourceNode:  MediaStreamAudioSourceNode | null = null
+let animationId: number | null = null
 let timeDomainBuf: Float32Array<ArrayBuffer> | null = null
 
-const BUFFER_SIZE   = 8192    // larger → better low-freq resolution
-const RMS_THRESHOLD = 0.008   // silence gate
-const YIN_THRESHOLD = 0.15    // slightly permissive for real instruments
+// ── Detection constants ───────────────────────────────────────────────
+const BUFFER_SIZE      = 8192   // 8 k samples → ~186 ms @ 44.1 kHz — good for C4
+const RMS_FLOOR        = 0.006  // strict silence gate (was 0.008 — slightly quieter)
+const MPM_K            = 0.93   // key-maximum threshold (standard MPM value)
 
-// ── Hann window ──────────────────────────────────────────────────────
-function applyHannWindow(input: Float32Array): Float32Array {
-  const out = new Float32Array(input.length)
-  const N   = input.length
+// Ukulele physical range: low-G3 (196 Hz) – A5 (880 Hz) + headroom
+const FREQ_MIN = 150
+const FREQ_MAX = 1000
+
+// ── Hann window ───────────────────────────────────────────────────────
+function applyHannWindow(buf: Float32Array): Float32Array {
+  const N   = buf.length
+  const out = new Float32Array(N)
   for (let i = 0; i < N; i++) {
-    out[i] = input[i] * 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)))
+    out[i] = buf[i] * 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)))
   }
   return out
 }
 
-// ── YIN difference function ──────────────────────────────────────────
-function yinDiff(buf: Float32Array, maxTau: number): Float32Array {
-  const yin = new Float32Array(maxTau + 1)
-  for (let tau = 1; tau <= maxTau; tau++) {
-    let sum = 0
-    const limit = buf.length - tau
-    for (let i = 0; i < limit; i++) {
-      const d = buf[i] - buf[i + tau]
-      sum += d * d
+// ── Normalised Square Difference Function (NSDF) ──────────────────────
+//
+// m'(τ) = 2 · Σ x(i)·x(i+τ) / Σ (x(i)² + x(i+τ)²)
+//
+// Values in [-1, 1]; peaks near 1 indicate a strong periodic match.
+function computeNSDF(buf: Float32Array, minLag: number, maxLag: number): Float32Array {
+  const N    = buf.length
+  const nsdf = new Float32Array(maxLag + 1)
+
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let acf  = 0   // numerator: cross-correlation
+    let norm = 0   // denominator: sum of squared amplitudes
+    const n  = N - lag
+    for (let i = 0; i < n; i++) {
+      acf  += buf[i] * buf[i + lag]
+      norm += buf[i] * buf[i] + buf[i + lag] * buf[i + lag]
     }
-    yin[tau] = sum
+    nsdf[lag] = norm > 1e-10 ? (2 * acf) / norm : 0
   }
-  return yin
+
+  return nsdf
 }
 
-// ── Cumulative mean normalised difference ────────────────────────────
-function cmndf(yin: Float32Array): void {
-  yin[0] = 1
-  let running = 0
-  for (let tau = 1; tau < yin.length; tau++) {
-    running += yin[tau]
-    yin[tau] = running === 0 ? 1 : (yin[tau] * tau) / running
+// ── Key-maxima extraction ─────────────────────────────────────────────
+//
+// Scan the NSDF for positive regions; pick the highest point in each.
+// These are the "key maxima" per the MPM paper.
+function findKeyMaxima(
+  nsdf:   Float32Array,
+  minLag: number,
+  maxLag: number,
+): Array<{ lag: number; value: number }> {
+  const maxima: Array<{ lag: number; value: number }> = []
+  let inPos     = false
+  let bestVal   = -Infinity
+  let bestLag   = -1
+
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    const v = nsdf[lag]
+    if (v > 0) {
+      inPos = true
+      if (v > bestVal) { bestVal = v; bestLag = lag }
+    } else if (inPos) {
+      if (bestLag >= 0 && bestVal > 0) maxima.push({ lag: bestLag, value: bestVal })
+      inPos = false; bestVal = -Infinity; bestLag = -1
+    }
   }
+  if (inPos && bestLag >= 0 && bestVal > 0) maxima.push({ lag: bestLag, value: bestVal })
+
+  return maxima
 }
 
-// ── Parabolic interpolation for sub-sample refinement ───────────────
-function parabolicInterp(yin: Float32Array, tau: number): number {
-  const prev = tau > 1                   ? yin[tau - 1] : yin[tau]
-  const curr = yin[tau]
-  const next = tau + 1 < yin.length     ? yin[tau + 1] : curr
+// ── Parabolic interpolation for sub-sample refinement ─────────────────
+function parabolicInterp(nsdf: Float32Array, lag: number): number {
+  const prev = lag > 0             ? nsdf[lag - 1] : nsdf[lag]
+  const curr = nsdf[lag]
+  const next = lag + 1 < nsdf.length ? nsdf[lag + 1] : curr
   const denom = 2 * (2 * curr - prev - next)
-  return denom !== 0 ? tau + (next - prev) / denom : tau
+  return denom !== 0 ? lag + (next - prev) / denom : lag
 }
 
-// ── Core pitch detection ─────────────────────────────────────────────
+// ── Sub-harmonic octave-error fix ────────────────────────────────────
+//
+// MPM occasionally picks up the 2nd harmonic (octave up).
+// If the detected frequency is close to 2× a target string's frequency,
+// we halve it and verify the halved frequency also makes physical sense.
+const UKE_TARGETS = [196.0, 261.63, 329.63, 392.0, 440.0, 493.88]
+
+function fixOctaveError(freq: number, sampleRate: number): number {
+  const sub = freq / 2
+  if (sub < FREQ_MIN) return freq   // already at fundamental range
+
+  // Is the halved frequency closer to a known uke string?
+  const errFull = Math.min(...UKE_TARGETS.map((t) => Math.abs(freq - t)))
+  const errHalf = Math.min(...UKE_TARGETS.map((t) => Math.abs(sub  - t)))
+
+  // Halve only when sub-harmonic is clearly a better match (>25 Hz closer)
+  return errHalf + 25 < errFull ? sub : freq
+
+  // suppress unused warning
+  void sampleRate
+}
+
+// ── Core pitch detection (single frame) ──────────────────────────────
 function detectPitch(rawBuf: Float32Array, sampleRate: number): PitchDetectionResult {
-  // Silence gate
+  // 1. RMS silence gate
   let rms = 0
   for (let i = 0; i < rawBuf.length; i++) rms += rawBuf[i] * rawBuf[i]
   rms = Math.sqrt(rms / rawBuf.length)
-  if (rms < RMS_THRESHOLD) return { frequency: null, clarity: 0 }
+  if (rms < RMS_FLOOR) return { frequency: null, clarity: 0 }
 
-  // Windowing
+  // 2. Hann window
   const buf = applyHannWindow(rawBuf)
 
-  // Ukulele frequency range: 196 Hz (low G3) – 880 Hz (A5)
-  // We use a slightly wider range for robustness
-  const minFreq = 150
-  const maxFreq = 1000
-  const maxTau  = Math.floor(sampleRate / minFreq)
-  const minTau  = Math.floor(sampleRate / maxFreq)
+  // 3. Lag bounds for the target frequency range
+  const maxLag = Math.floor(sampleRate / FREQ_MIN)
+  const minLag = Math.floor(sampleRate / FREQ_MAX)
 
-  const yin = yinDiff(buf, maxTau)
-  cmndf(yin)
+  // 4. NSDF
+  const nsdf = computeNSDF(buf, minLag, maxLag)
 
-  // Find first tau below threshold (local minimum)
-  let tauEst = -1
-  for (let tau = minTau; tau <= maxTau; tau++) {
-    if (yin[tau] < YIN_THRESHOLD) {
-      // Walk forward to true local minimum
-      while (tau + 1 <= maxTau && yin[tau + 1] < yin[tau]) tau++
-      tauEst = tau
+  // 5. Key maxima
+  const maxima = findKeyMaxima(nsdf, minLag, maxLag)
+  if (maxima.length === 0) return { frequency: null, clarity: 0 }
+
+  // 6. Global maximum and MPM threshold
+  let globalMax = -Infinity
+  for (const m of maxima) if (m.value > globalMax) globalMax = m.value
+
+  if (globalMax <= 0) return { frequency: null, clarity: 0 }
+  const threshold = MPM_K * globalMax
+
+  // 7. Pick the first key maximum above the threshold (lowest lag = highest freq)
+  let chosenLag = -1
+  let chosenClarity = 0
+  for (const m of maxima) {
+    if (m.value >= threshold) {
+      chosenLag     = m.lag
+      chosenClarity = m.value
       break
     }
   }
+  if (chosenLag < 0) { chosenLag = maxima[0].lag; chosenClarity = maxima[0].value }
 
-  if (tauEst < 0) {
-    // No tau below strict threshold — try absolute minimum as fallback
-    let minVal = Infinity, minTauFallback = -1
-    for (let tau = minTau; tau <= maxTau; tau++) {
-      if (yin[tau] < minVal) { minVal = yin[tau]; minTauFallback = tau }
-    }
-    if (minVal > 0.35 || minTauFallback < 0) return { frequency: null, clarity: 0 }
-    tauEst = minTauFallback
-  }
+  // 8. Sub-sample refinement via parabolic interpolation
+  const refinedLag = parabolicInterp(nsdf, chosenLag)
+  let   frequency  = sampleRate / refinedLag
 
-  const refinedTau = parabolicInterp(yin, tauEst)
-  const frequency  = sampleRate / refinedTau
-  const clarity    = Math.max(0, Math.min(1, 1 - yin[tauEst]))
-
-  if (!Number.isFinite(frequency) || frequency < minFreq || frequency > maxFreq) {
+  // 9. Guard: frequency must be within expected range
+  if (!Number.isFinite(frequency) || frequency < FREQ_MIN || frequency > FREQ_MAX) {
     return { frequency: null, clarity: 0 }
   }
 
-  return { frequency, clarity }
+  // 10. Sub-harmonic octave-error correction
+  frequency = fixOctaveError(frequency, sampleRate)
+
+  return { frequency, clarity: Math.max(0, Math.min(1, chosenClarity)) }
 }
 
-// ── Public API ───────────────────────────────────────────────────────
+// ── Median filter — 3-frame rolling buffer ────────────────────────────
+// Suppresses transient spikes without adding lag.
+const MEDIAN_N = 3
+const medianBuf: number[] = []
+
+function medianFilter(value: number): number {
+  medianBuf.push(value)
+  if (medianBuf.length > MEDIAN_N) medianBuf.shift()
+  const sorted = [...medianBuf].sort((a, b) => a - b)
+  return sorted[Math.floor(sorted.length / 2)]
+}
+
+// ── Public API ────────────────────────────────────────────────────────
 
 /**
- * Start pitch detection.
+ * Start live pitch detection.
  *
- * MUST be called from a user-gesture handler on iOS (tap, click, etc.).
- * Internally creates a new AudioContext and requests microphone access.
+ * MUST be called from within a user-gesture handler (tap/click) on iOS
+ * so that AudioContext creation and getUserMedia both succeed.
+ *
+ * @param onPitch  Called every animation frame with the latest reading.
  */
 export async function startPitchDetection(
   onPitch: (result: PitchDetectionResult) => void,
 ): Promise<void> {
-  if (animationId !== null) return     // already running
+  if (animationId !== null) return   // already running
 
-  // Create AudioContext synchronously — must happen in user-gesture call stack
-  audioContext = new AudioContext()
-  // resume() here is within the user-gesture call chain → works on iOS
-  if (audioContext.state === "suspended") {
-    try { audioContext.resume() } catch {}
+  // Create AudioContext synchronously inside the user-gesture call stack
+  audioCtx = new AudioContext()
+  if (audioCtx.state === "suspended") {
+    try { audioCtx.resume() } catch {}
   }
 
-  // Request mic — show system permission dialog if needed
+  // Request microphone with quality constraints
   mediaStream = await navigator.mediaDevices.getUserMedia({
     audio: {
       echoCancellation: false,
       noiseSuppression: false,
       autoGainControl:  false,
-      // iOS sometimes ignores these, but setting them signals intent
       sampleRate:       { ideal: 44100 },
+      channelCount:     { ideal: 1 },
     },
   })
 
-  // After getUserMedia resolves, resume again in case context is still suspended
-  if (audioContext.state === "suspended") {
-    try { await audioContext.resume() } catch {}
+  // Resume again — getUserMedia can suspend the context on some browsers
+  if (audioCtx.state === "suspended") {
+    try { await audioCtx.resume() } catch {}
   }
 
-  sourceNode = audioContext.createMediaStreamSource(mediaStream)
-  analyser   = audioContext.createAnalyser()
-  analyser.fftSize          = BUFFER_SIZE
-  analyser.smoothingTimeConstant = 0   // raw frames — we handle smoothing ourselves
+  // Wire audio graph: mic → analyser (no output → no feedback)
+  sourceNode = audioCtx.createMediaStreamSource(mediaStream)
+  analyser   = audioCtx.createAnalyser()
+  analyser.fftSize               = BUFFER_SIZE
+  analyser.smoothingTimeConstant = 0   // raw frames; caller handles smoothing
   timeDomainBuf = new Float32Array(analyser.fftSize)
 
   sourceNode.connect(analyser)
 
+  // Warm up the median filter
+  medianBuf.length = 0
+
   const loop = () => {
-    if (!analyser || !timeDomainBuf) return
+    if (!analyser || !timeDomainBuf || !audioCtx) return
     analyser.getFloatTimeDomainData(timeDomainBuf)
-    onPitch(detectPitch(timeDomainBuf, audioContext!.sampleRate))
+    const raw = detectPitch(timeDomainBuf, audioCtx.sampleRate)
+
+    // Apply median filter to reject single-frame spikes
+    const result: PitchDetectionResult = raw.frequency !== null
+      ? { frequency: medianFilter(raw.frequency), clarity: raw.clarity }
+      : raw
+
+    onPitch(result)
     animationId = requestAnimationFrame(loop)
   }
   loop()
 }
 
+/** Stop pitch detection and release all audio resources. */
 export function stopPitchDetection(): void {
   if (animationId !== null) { cancelAnimationFrame(animationId); animationId = null }
   sourceNode?.disconnect();  sourceNode  = null
   mediaStream?.getTracks().forEach((t) => t.stop()); mediaStream = null
-  audioContext?.close();     audioContext = null
+  audioCtx?.close();         audioCtx   = null
   analyser      = null
   timeDomainBuf = null
+  medianBuf.length = 0
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────
 
-/** Convert raw frequency → note name + octave */
+/** Convert a frequency (Hz) to the nearest note name + octave + cents offset. */
 export function frequencyToNote(freq: number): { note: string; octave: number; cents: number } {
   const A4        = 440
   const semitones = 12 * Math.log2(freq / A4)
@@ -205,7 +294,10 @@ export function frequencyToNote(freq: number): { note: string; octave: number; c
   }
 }
 
-/** Cents difference between detected and target frequency */
+/**
+ * Signed cents difference between a detected frequency and a target.
+ * Negative = flat, positive = sharp.
+ */
 export function centsDifference(detected: number, target: number): number {
   return Math.round(1200 * Math.log2(detected / target))
 }

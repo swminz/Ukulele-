@@ -1,7 +1,11 @@
-import { useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import { Trash2 } from "lucide-react"
 
 const DELETE_W = 80
+
+// Custom event used to coordinate exclusive open state across all rows.
+// When one row opens, it broadcasts its unique ID so all others close.
+const SWIPE_EVENT = "swipe-row-opened"
 
 interface Props {
   onDelete: () => void
@@ -14,6 +18,9 @@ interface Props {
  * Uses window-level pointermove/pointerup listeners instead of
  * setPointerCapture so that click events on child elements are
  * never swallowed on iOS Safari / mobile browsers.
+ *
+ * Only one row can be open at a time — opening one automatically
+ * closes any other that is currently revealed.
  */
 export function SwipeableRow({ onDelete, children }: Props) {
   const contentRef = useRef<HTMLDivElement>(null)
@@ -22,14 +29,30 @@ export function SwipeableRow({ onDelete, children }: Props) {
   const baseOff  = useRef(0)
   // True only when the finger actually slid horizontally > threshold
   const wasDrag  = useRef(false)
+  // Stable unique ID for this row instance
+  const rowId = useRef(`sr_${Math.random().toString(36).slice(2)}`)
 
-  const snap = (toOpen: boolean) => {
+  const snap = (toOpen: boolean, broadcast = true) => {
     setOpen(toOpen)
     const el = contentRef.current
     if (!el) return
     el.style.transition = "transform 0.22s cubic-bezier(0.25,0.46,0.45,0.94)"
     el.style.transform  = `translateX(${toOpen ? -DELETE_W : 0}px)`
+    // Notify sibling rows to close when this one opens
+    if (toOpen && broadcast) {
+      window.dispatchEvent(new CustomEvent(SWIPE_EVENT, { detail: { id: rowId.current } }))
+    }
   }
+
+  // Close self when another row announces it has opened
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ id: string }>
+      if (ce.detail.id !== rowId.current) snap(false, false)
+    }
+    window.addEventListener(SWIPE_EVENT, handler)
+    return () => window.removeEventListener(SWIPE_EVENT, handler)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return
@@ -81,14 +104,15 @@ export function SwipeableRow({ onDelete, children }: Props) {
 
   return (
     <div className="swipe-row">
-      {/* Red delete action — sits behind the sliding content */}
+      {/* Red delete action — inset 1 px from top+bottom so it never bleeds
+          into the separator hairline that sits at top:0 of the next row */}
       <div
         aria-hidden
         style={{
           position:       "absolute",
           right:          0,
-          top:            0,
-          bottom:         0,
+          top:            1,           // keep 1 px clear of separator line
+          bottom:         1,
           width:          DELETE_W,
           background:     "#FF3B30",
           display:        "flex",
@@ -122,10 +146,15 @@ export function SwipeableRow({ onDelete, children }: Props) {
         </button>
       </div>
 
-      {/* Sliding content — explicit card background prevents red bleed-through */}
+      {/* Sliding content
+          position:relative + z-index:1 ensure this always paints above the
+          absolutely-positioned red div regardless of stacking-context edge cases.
+          background:var(--card) covers any sub-pixel gap on the right edge. */}
       <div
         ref={contentRef}
         style={{
+          position:    "relative",
+          zIndex:      1,
           transform:   "translateX(0)",
           willChange:  "transform",
           touchAction: "pan-y",

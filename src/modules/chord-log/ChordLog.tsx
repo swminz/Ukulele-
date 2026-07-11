@@ -81,7 +81,7 @@ type SongsTab = "music" | "songs"
 export function ChordLog({ addTrigger, uploadTrigger }: Props) {
   const [songs,            setSongs]           = useState<Song[]>([])
   const [query,            setQuery]           = useState("")
-  const [tab,              setTab]             = useState<SongsTab>("songs")
+  const [tab,              setTab]             = useState<SongsTab>("music")
   const [viewSong,         setViewSong]        = useState<Song | null>(null)
   const [editSong,         setEditSong]        = useState<Song | null>(null)
   const [isCreating,       setIsCreating]      = useState(false)

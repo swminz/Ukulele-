@@ -42,41 +42,42 @@ const TUNINGS: TuningPreset[] = [
 
 const TUNING_KEY  = "ukepocket_tuning"
 const METER_RANGE = 30   // ±30 cents full-scale
-const IN_TUNE_CENTS = 5  // ±5 cents = "in tune"
 
-// ── Clarity / smoothing constants ─────────────────────────────────────────────
-// Lower CLARITY_MIN = more detections (at cost of occasional false readings).
-// SMOOTHER_FAST blends in new readings quickly for a live-needle feel.
-const CLARITY_MIN   = 0.40
-const SMOOTHER_FAST = 0.45   // weight given to new reading (higher = more responsive)
+// ── Backend tuning constants ───────────────────────────────────────────────────
+// IN_TUNE_HZ: absolute Hz tolerance for "In Tune" — ±1 Hz as specified.
+// At A4 (440 Hz) that's ≈ 3.9 cents; at C4 (261 Hz) it's ≈ 6.6 cents.
+const IN_TUNE_HZ    = 1.0   // ±1 Hz "in tune" window
+
+// MPM produces higher-quality readings than the old YIN, so we can afford
+// a stricter clarity floor and a faster blend for a snappier needle.
+const CLARITY_MIN   = 0.45  // raised from 0.40 — fewer false readings from MPM
+const SMOOTHER_FAST = 0.55  // raised from 0.45 — MPM is less noisy → faster response
 
 type TuneStatus = "idle" | "listening" | "flat" | "sharp" | "intune"
 
 // ── Layout constants ──────────────────────────────────────────────────────────
-// Headstock SVG rendered at HS_W px so button positions can be computed
-// precisely from the viewBox coordinates.
+// viewBox "0 0 200 340":
+//   Pegs are still at cy = 52 (top) and cy = 142 (bottom) — unchanged.
+//   HS_W reduced from 220 → 194 so that HS_H = 194*(340/200) ≈ 330 px,
+//   keeping the rendered height identical and avoiding any page scroll.
+//   The extra 40 viewBox units at the bottom go entirely to the longer fretboard.
 //
-// viewBox "0 0 200 300":
-//   TOP pegs (C / E): cy = 52
-//   BOT pegs (G / A): cy = 142
-//
-// At HS_W=220 → HS_H=330
-//   TOP_PEG_Y = 330 * 52/300 ≈ 57 px
-//   BOT_PEG_Y = 330 * 142/300 ≈ 156 px
-//   TOP_PAD   = 57 − 26 = 31 px
-//   BTN_GAP   = 156 − 57 − 52 = 47 px
+//   TOP_PEG_Y = 330 * 52/340 ≈ 50 px
+//   BOT_PEG_Y = 330 * 142/340 ≈ 138 px
+//   TOP_PAD   = 50 − 26 = 24 px
+//   BTN_GAP   = 138 − 50 − 52 = 36 px
 
-const HS_W       = 220
-const VIEWBOX_H  = 300
+const HS_W       = 194
+const VIEWBOX_H  = 340
 const VIEWBOX_W  = 200
 const PEG_TOP_VB = 52
 const PEG_BOT_VB = 142
-const HS_H       = HS_W * VIEWBOX_H / VIEWBOX_W         // 330
-const TOP_PEG_Y  = HS_H * PEG_TOP_VB / VIEWBOX_H       // ≈ 57
-const BOT_PEG_Y  = HS_H * PEG_BOT_VB / VIEWBOX_H       // ≈ 156
+const HS_H       = HS_W * VIEWBOX_H / VIEWBOX_W         // ≈ 330
+const TOP_PEG_Y  = HS_H * PEG_TOP_VB / VIEWBOX_H       // ≈ 50
+const BOT_PEG_Y  = HS_H * PEG_BOT_VB / VIEWBOX_H       // ≈ 138
 const BTN_HALF   = 26
-const TOP_PAD    = Math.max(0, TOP_PEG_Y - BTN_HALF)   // ≈ 31
-const BTN_GAP    = BOT_PEG_Y - TOP_PEG_Y - 52          // ≈ 47
+const TOP_PAD    = Math.max(0, TOP_PEG_Y - BTN_HALF)   // ≈ 24
+const BTN_GAP    = BOT_PEG_Y - TOP_PEG_Y - 52          // ≈ 36
 
 // ── Headstock SVG ─────────────────────────────────────────────────────────────
 const PEG_KNOB = [
@@ -98,7 +99,7 @@ const STRING_PATHS = [
   `M ${NUT_X[2]},177 Q 148,115 184,52`,
   `M ${NUT_X[3]},177 Q 160,162 184,142`,
 ]
-const FRET_Y = [206, 237, 268]
+const FRET_Y = [210, 252, 295]   // re-spaced for the taller 177→340 fretboard
 
 interface HeadstockProps {
   selectedString: number | null  // user-tapped string
@@ -112,7 +113,8 @@ function MinimalHeadstock({ selectedString, autoString, inTune, isListening }: H
   const activeIdx = selectedString ?? autoString
 
   function stringColor(i: number) {
-    if (i !== activeIdx) return "rgba(60,60,67,0.2)"
+    // 100% solid — strings punch through the transparent fretboard in both themes
+    if (i !== activeIdx) return "rgb(110,108,105)"
     return inTune && isListening ? "#34C759" : "var(--primary)"
   }
   function sw(i: number) { return i === activeIdx ? 2 : 1.4 }
@@ -132,25 +134,25 @@ function MinimalHeadstock({ selectedString, autoString, inTune, isListening }: H
   }
 
   return (
-    <svg viewBox="0 0 200 300" width={HS_W} height={HS_H}
+    <svg viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`} width={HS_W} height={HS_H}
       aria-hidden style={{ display: "block", flexShrink: 0 }}>
 
-      {/* Headstock body */}
+      {/* Headstock body — stroke uses a mid-gray that reads in both light & dark */}
       <rect x={36} y={8} width={128} height={162} rx={20}
-        fill="var(--card)" stroke="#D1D1D6" strokeWidth={1.5} />
+        fill="var(--card)" stroke="rgba(160,160,170,0.6)" strokeWidth={1.8} />
 
       {/* Left shafts */}
-      <rect x={16} y={46} width={24} height={12} rx={3} fill="#E5E7EB" />
-      <rect x={16} y={136} width={24} height={12} rx={3} fill="#E5E7EB" />
+      <rect x={16} y={46} width={24} height={12} rx={3} fill="rgba(200,200,210,0.7)" />
+      <rect x={16} y={136} width={24} height={12} rx={3} fill="rgba(200,200,210,0.7)" />
       {/* Right shafts */}
-      <rect x={160} y={46} width={24} height={12} rx={3} fill="#E5E7EB" />
-      <rect x={160} y={136} width={24} height={12} rx={3} fill="#E5E7EB" />
+      <rect x={160} y={46} width={24} height={12} rx={3} fill="rgba(200,200,210,0.7)" />
+      <rect x={160} y={136} width={24} height={12} rx={3} fill="rgba(200,200,210,0.7)" />
 
       {/* String post holes */}
       {STRING_POST.map(({ cx, cy }, i) => (
         <g key={`post-${i}`}>
-          <circle cx={cx} cy={cy} r={7} fill="none" stroke="#D1D1D6" strokeWidth={1.2} />
-          <circle cx={cx} cy={cy} r={2.5} fill="#D1D1D6" />
+          <circle cx={cx} cy={cy} r={7} fill="none" stroke="rgba(160,160,170,0.6)" strokeWidth={1.2} />
+          <circle cx={cx} cy={cy} r={2.5} fill="rgba(160,160,170,0.7)" />
         </g>
       ))}
 
@@ -178,16 +180,27 @@ function MinimalHeadstock({ selectedString, autoString, inTune, isListening }: H
       ))}
 
       {/* Nut */}
-      <rect x={34} y={170} width={132} height={7} rx={2} fill="#C7C7CC" />
+      <rect x={34} y={170} width={132} height={7} rx={2} fill="rgba(180,175,165,0.85)" />
 
-      {/* Fret lines */}
+      {/* Fretboard / neck body
+           Fill: low-opacity so the page background shows through (transparent look).
+           Stroke: fully opaque — clearly the neck outline, distinct from strings.
+           Strings are drawn after this rect (on top) so they appear 100% solid
+           regardless of the fill opacity, in both light and dark themes. */}
+      <rect x={46} y={177} width={108} height={163} rx={4}
+        fill="rgba(200,198,195,0.22)"
+        stroke="rgba(118,116,114,0.92)"
+        strokeWidth={2} />
+
+      {/* Fret lines — warm light grey, thinner than outline, distinct from strings */}
       {FRET_Y.map((y) => (
-        <line key={y} x1={55} y1={y} x2={145} y2={y} stroke="#E5E7EB" strokeWidth={1.2} />
+        <line key={y} x1={46} y1={y} x2={154} y2={y}
+          stroke="rgba(168,166,163,0.60)" strokeWidth={1.2} />
       ))}
 
-      {/* Fretboard strings */}
+      {/* Fretboard strings — extend to new viewBox bottom */}
       {NUT_X.map((x, i) => (
-        <line key={i} x1={x} y1={177} x2={x} y2={300}
+        <line key={i} x1={x} y1={177} x2={x} y2={340}
           stroke={stringColor(i)} strokeWidth={sw(i)} strokeLinecap="round"
           style={{ transition: "stroke 0.25s ease" }} />
       ))}
@@ -195,7 +208,7 @@ function MinimalHeadstock({ selectedString, autoString, inTune, isListening }: H
       {/* In-tune pulse on fretboard */}
       {activeIdx !== null && inTune && isListening && (
         <line
-          x1={NUT_X[activeIdx!]} y1={177} x2={NUT_X[activeIdx!]} y2={300}
+          x1={NUT_X[activeIdx!]} y1={177} x2={NUT_X[activeIdx!]} y2={340}
           stroke="#34C759" strokeWidth={3.5} strokeLinecap="round" opacity={0}
           style={{ animation: "stringPulse 1.6s ease-in-out infinite" }}
         />
@@ -334,7 +347,9 @@ function HorizontalMeter({ cents, isActive, inTune }: MeterProps) {
   const W = 300, H = 52, cx = W / 2, trackY = 38, zoneTop = 8
   const clamped = Math.max(-METER_RANGE, Math.min(METER_RANGE, cents))
   const needleX = isActive ? cx + (clamped / METER_RANGE) * cx : cx
-  const zoneHW  = (IN_TUNE_CENTS / METER_RANGE) * cx
+  // ±5 cents visual zone (meter display only — in-tune detection uses ±1 Hz)
+  const ZONE_CENTS = 5
+  const zoneHW  = (ZONE_CENTS / METER_RANGE) * cx
   const ticks   = Array.from({ length: 13 }, (_, i) => {
     const c = -30 + i * 5; const major = c % 10 === 0
     return { x: cx + (c / METER_RANGE) * cx, major, c }
@@ -456,7 +471,8 @@ export function ReferenceTuner() {
   const targetString    = activeStringIdx !== null ? s[activeStringIdx] : null
   const targetFreq      = targetString?.freq ?? null
   const cents           = detectedFreq && targetFreq ? centsDifference(detectedFreq, targetFreq) : 0
-  const inTune          = Boolean(detectedFreq && targetFreq && Math.abs(cents) <= IN_TUNE_CENTS)
+  // ±1 Hz absolute frequency check — more musically meaningful than a fixed cents value
+  const inTune          = Boolean(detectedFreq && targetFreq && Math.abs(detectedFreq - targetFreq) <= IN_TUNE_HZ)
   const detectedNote    = detectedFreq ? frequencyToNote(detectedFreq) : null
 
   const status: TuneStatus =
@@ -464,7 +480,7 @@ export function ReferenceTuner() {
     !hasStarted                    ? "idle"      :
     !detectedFreq                  ? "listening" :
     inTune                         ? "intune"    :
-    cents < -IN_TUNE_CENTS         ? "flat"      :
+    cents < 0                      ? "flat"      :
                                      "sharp"
 
   // Display note: show detected note when listening, else target string name
