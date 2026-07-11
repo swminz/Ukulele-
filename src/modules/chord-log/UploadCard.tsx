@@ -174,11 +174,11 @@ export function PDFUploadCard({ song, onOpen, onToggleFavorite, onDelete }: PDFC
 
       {/* PDF icon */}
       <div style={{
-        width: 36, height: 36, borderRadius: 8, background: "rgba(255,59,48,0.1)",
+        width: 36, height: 36, borderRadius: 8, background: "rgba(120,120,128,0.1)",
         display: "flex", alignItems: "center", justifyContent: "center",
         flexShrink: 0, marginRight: 10,
       }}>
-        <FileText size={18} strokeWidth={1.5} style={{ color: "#FF3B30" }} />
+        <FileText size={18} strokeWidth={1.5} style={{ color: "var(--text-tertiary)" }} />
       </div>
 
       {/* Info */}

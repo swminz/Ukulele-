@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import type { Song, SongPDF } from "@/types"
-import { saveSong, deleteSong } from "@/lib/db"
-import { Edit3, Trash2, Copy, Heart, Share2, Play, Pause, FileText, Music2, ChevronRight, ChevronLeft } from "lucide-react"
+import { deleteSong } from "@/lib/db"
+import { Edit3, Trash2, Heart, Share2, Play, Pause, FileText, Music2, ChevronLeft } from "lucide-react"
 import { haptic } from "@/lib/audio"
 import { useSettings } from "@/hooks/use-settings"
 import { PDFViewer } from "@/modules/pdf-songbook/PDFViewer"
@@ -13,11 +13,10 @@ interface Props {
   onClose: () => void
   onEdit: (song: Song) => void
   onDeleted: () => void
-  onDuplicate: (song: Song) => void
   onToggleFavorite: (song: Song) => void
 }
 
-export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onDuplicate, onToggleFavorite }: Props) {
+export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onToggleFavorite }: Props) {
   const [song,             setSong]             = useState(initialSong)
   const [segment,          setSegment]          = useState<Segment>("chords")
   const [pdfOpen,          setPdfOpen]          = useState(false)
@@ -82,13 +81,6 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onDup
     haptic([10, 50, 10])
     await deleteSong(song.id)
     onDeleted()
-  }
-
-  const handleDuplicate = async () => {
-    const dup: Song = { ...song, id: `song_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, title: `${song.title} (copy)`, createdAt: Date.now(), modifiedAt: Date.now(), favorite: false }
-    await saveSong(dup)
-    haptic(10)
-    onDuplicate(dup)
   }
 
   const handleFavorite = () => {
@@ -169,21 +161,35 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onDup
         </div>
       </div>
 
-      {/* ── Segments ── */}
+      {/* ── Underline tab bar (matches Practice tab style) ── */}
       {segments.length > 1 && (
-        <div style={{ padding: "10px 16px", flexShrink: 0, borderBottom: "1px solid var(--separator)" }}>
-          <div className="ios-segmented">
-            {segments.map((seg) => (
+        <div style={{ display: "flex", flexShrink: 0, borderBottom: "1px solid var(--separator)" }}>
+          {segments.map((seg) => {
+            const active = segment === seg.id
+            return (
               <button
                 key={seg.id}
                 onClick={() => setSegment(seg.id)}
-                className={`ios-segmented-item ${segment === seg.id ? "active" : ""}`}
-                aria-pressed={segment === seg.id}
+                aria-pressed={active}
+                style={{
+                  flex:          1,
+                  padding:       "13px 0 11px",
+                  background:    "none",
+                  border:        "none",
+                  borderBottom:  active ? "2px solid var(--primary)" : "2px solid transparent",
+                  marginBottom:  -1,
+                  color:         active ? "var(--primary)" : "var(--text-tertiary)",
+                  fontSize:      15,
+                  fontWeight:    active ? 600 : 400,
+                  letterSpacing: "-0.24px",
+                  cursor:        "pointer",
+                  transition:    "color 0.15s ease, border-color 0.15s ease",
+                }}
               >
                 {seg.label}
               </button>
-            ))}
-          </div>
+            )
+          })}
         </div>
       )}
 
@@ -330,15 +336,6 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onDup
           {/* Actions */}
           <p className="section-label" style={{ paddingLeft: 16, marginBottom: 6 }}>Actions</p>
           <div className="grouped-section" style={{ marginBottom: 24 }}>
-            <button
-              onClick={handleDuplicate}
-              className="grouped-row"
-              style={{ width: "100%", border: "none", cursor: "pointer", gap: 12 }}
-            >
-              <Copy size={18} strokeWidth={1.5} style={{ color: "var(--primary)" }} />
-              <span style={{ fontSize: 17, color: "var(--foreground)", letterSpacing: "-0.41px", flex: 1, textAlign: "left" }}>Duplicate Song</span>
-              <ChevronRight size={16} style={{ color: "var(--text-tertiary)", opacity: 0.6 }} />
-            </button>
             <button
               onClick={handleDelete}
               className="grouped-row"

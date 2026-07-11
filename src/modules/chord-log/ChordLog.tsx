@@ -76,9 +76,12 @@ interface DuplicatePending {
   existingSong: Song
 }
 
+type SongsTab = "music" | "songs"
+
 export function ChordLog({ addTrigger, uploadTrigger }: Props) {
   const [songs,            setSongs]           = useState<Song[]>([])
   const [query,            setQuery]           = useState("")
+  const [tab,              setTab]             = useState<SongsTab>("songs")
   const [viewSong,         setViewSong]        = useState<Song | null>(null)
   const [editSong,         setEditSong]        = useState<Song | null>(null)
   const [isCreating,       setIsCreating]      = useState(false)
@@ -194,11 +197,13 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
     )
   })
 
-  // Uploads (audio or PDF with isUploaded flag) shown at the top
-  const uploads      = filtered.filter((s) => s.isUploaded)
-  const nonUploads   = filtered.filter((s) => !s.isUploaded)
-  const favorites    = nonUploads.filter((s) =>  s.favorite)
-  const nonFavorites = nonUploads.filter((s) => !s.favorite)
+  // Music Notes tab: PDF uploads only
+  const sheetUploads = filtered.filter((s) => s.isUploaded && s.pdf)
+  // Songs tab: regular (non-uploaded) songs + audio uploads
+  const songsList    = filtered.filter((s) => !s.isUploaded || s.audio)
+  const favorites    = songsList.filter((s) => !s.isUploaded && s.favorite)
+  const nonFavorites = songsList.filter((s) => !s.isUploaded && !s.favorite)
+  const audioUploads = songsList.filter((s) =>  s.isUploaded && s.audio)
 
   // ── Handlers ──────────────────────────────────────────────────────────
   const handleCreate = () => {
@@ -236,11 +241,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
     if (viewSong?.id === updated.id) setViewSong(updated)
   }
 
-  const handleDuplicate = async (dup: Song) => {
-    await saveSong(dup)
-    await load()
-    setViewSong(null)
-  }
 
   // ── Render ────────────────────────────────────────────────────────────
   if (editSong) {
@@ -254,7 +254,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
     )
   }
 
-  const totalNonUpload = favorites.length + nonFavorites.length
   const isEmpty = songs.length === 0 && !uploading
 
   return (
@@ -272,11 +271,41 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--background)" }}>
         {/* Search */}
-        <div style={{ padding: "10px 16px 12px", flexShrink: 0 }}>
+        <div style={{ padding: "10px 16px 0", flexShrink: 0 }}>
           <SearchBar value={query} onChange={setQuery} />
         </div>
 
-        {/* List */}
+        {/* ── Tab bar (underline style, matching Practice) ── */}
+        <div style={{ display: "flex", flexShrink: 0, borderBottom: "1px solid var(--separator)", marginTop: 6 }}>
+          {([["music", "Music Notes"], ["songs", "Songs"]] as [SongsTab, string][]).map(([id, label]) => {
+            const active = tab === id
+            return (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                aria-pressed={active}
+                style={{
+                  flex:          1,
+                  padding:       "13px 0 11px",
+                  background:    "none",
+                  border:        "none",
+                  borderBottom:  active ? "2px solid var(--primary)" : "2px solid transparent",
+                  marginBottom:  -1,
+                  color:         active ? "var(--primary)" : "var(--text-tertiary)",
+                  fontSize:      15,
+                  fontWeight:    active ? 600 : 400,
+                  letterSpacing: "-0.24px",
+                  cursor:        "pointer",
+                  transition:    "color 0.15s ease, border-color 0.15s ease",
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ── Tab content ── */}
         <div
           className="scroll-content"
           style={{ flex: 1, overflowY: "auto", padding: "0 16px calc(var(--safe-bottom) + 32px)" }}
@@ -285,65 +314,40 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
           {uploading && (
             <div style={{
               background: "rgba(0,122,255,0.07)", borderRadius: 12,
-              padding: "12px 16px", marginBottom: 16, textAlign: "center",
+              padding: "12px 16px", margin: "12px 0", textAlign: "center",
               fontSize: 14, color: "var(--primary)", fontWeight: 500,
             }}>
               Importing…
             </div>
           )}
 
-          {isEmpty ? (
-            <div style={{
-              display: "flex", flexDirection: "column", alignItems: "center",
-              justifyContent: "center", height: 280, textAlign: "center", gap: 10,
-            }}>
-              <p style={{ fontSize: 17, fontWeight: 600, color: "var(--foreground)" }}>No songs yet</p>
-              <p style={{ fontSize: 15, color: "var(--text-tertiary)", maxWidth: 240, lineHeight: "20px" }}>
-                Tap + to add your first song or upload a music file.
-              </p>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div style={{ textAlign: "center", paddingTop: 64 }}>
-              <p style={{ fontSize: 17, color: "var(--text-tertiary)" }}>No results for "{query}"</p>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-
-              {/* ── Uploads section ── */}
-              {uploads.length > 0 && (
-                <div>
-                  <p className="section-label" style={{ paddingLeft: 16, marginBottom: 8 }}>Uploads</p>
-                  <div className="grouped-section">
-                    {uploads.map((song) =>
-                      song.audio ? (
-                        <AudioUploadCard
-                          key={song.id}
-                          song={song}
-                          onOpen={() => setViewSong(song)}
-                          onToggleFavorite={() => handleToggleFavorite(song)}
-                          onDelete={() => handleDelete(song)}
-                        />
-                      ) : (
-                        <PDFUploadCard
-                          key={song.id}
-                          song={song}
-                          onOpen={() => setViewSong(song)}
-                          onToggleFavorite={() => handleToggleFavorite(song)}
-                          onDelete={() => handleDelete(song)}
-                        />
-                      )
-                    )}
+          {/* ════ MUSIC NOTES tab ════ */}
+          {tab === "music" && (
+            <>
+              {sheetUploads.length === 0 ? (
+                query ? (
+                  <div style={{ textAlign: "center", paddingTop: 64 }}>
+                    <p style={{ fontSize: 17, color: "var(--text-tertiary)" }}>No results for "{query}"</p>
                   </div>
-                </div>
-              )}
-
-              {/* ── Favorites ── */}
-              {favorites.length > 0 && (
-                <div>
-                  <p className="section-label" style={{ paddingLeft: 16, marginBottom: 8 }}>Favorites</p>
+                ) : (
+                  <div style={{
+                    display: "flex", flexDirection: "column", alignItems: "center",
+                    justifyContent: "center", height: 260, textAlign: "center", gap: 10,
+                  }}>
+                    <p style={{ fontSize: 17, fontWeight: 600, color: "var(--foreground)" }}>No sheets yet</p>
+                    <p style={{ fontSize: 15, color: "var(--text-tertiary)", maxWidth: 240, lineHeight: "20px" }}>
+                      Tap + then "Upload Music" to import a PDF sheet.
+                    </p>
+                  </div>
+                )
+              ) : (
+                <div style={{ paddingTop: 20 }}>
+                  <p style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", color: "var(--foreground)", marginBottom: 16, paddingLeft: 2 }}>
+                    Fingerstyle Music Sheets
+                  </p>
                   <div className="grouped-section">
-                    {favorites.map((song) => (
-                      <SongCard
+                    {sheetUploads.map((song) => (
+                      <PDFUploadCard
                         key={song.id}
                         song={song}
                         onOpen={() => setViewSong(song)}
@@ -354,30 +358,85 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
                   </div>
                 </div>
               )}
+            </>
+          )}
 
-              {/* ── All songs ── */}
-              {nonFavorites.length > 0 && (
-                <div>
-                  {(favorites.length > 0 || uploads.length > 0) && !query && (
-                    <p className="section-label" style={{ paddingLeft: 16, marginBottom: 8 }}>All Songs</p>
+          {/* ════ SONGS tab ════ */}
+          {tab === "songs" && (
+            <>
+              {isEmpty ? (
+                <div style={{
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  justifyContent: "center", height: 280, textAlign: "center", gap: 10,
+                }}>
+                  <p style={{ fontSize: 17, fontWeight: 600, color: "var(--foreground)" }}>No songs yet</p>
+                  <p style={{ fontSize: 15, color: "var(--text-tertiary)", maxWidth: 240, lineHeight: "20px" }}>
+                    Tap + to add your first song or upload a music file.
+                  </p>
+                </div>
+              ) : filtered.filter((s) => !s.isUploaded || s.audio).length === 0 ? (
+                <div style={{ textAlign: "center", paddingTop: 64 }}>
+                  <p style={{ fontSize: 17, color: "var(--text-tertiary)" }}>No results for "{query}"</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 24, paddingTop: 20 }}>
+
+                  {/* ── Favorites ── */}
+                  {favorites.length > 0 && (
+                    <div>
+                      <p className="section-label" style={{ paddingLeft: 16, marginBottom: 8 }}>Favorites</p>
+                      <div className="grouped-section">
+                        {favorites.map((song) => (
+                          <SongCard
+                            key={song.id}
+                            song={song}
+                            onOpen={() => setViewSong(song)}
+                            onToggleFavorite={() => handleToggleFavorite(song)}
+                            onDelete={() => handleDelete(song)}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   )}
-                  <div className="grouped-section">
-                    {nonFavorites.map((song) => (
-                      <SongCard
-                        key={song.id}
-                        song={song}
-                        onOpen={() => setViewSong(song)}
-                        onToggleFavorite={() => handleToggleFavorite(song)}
-                        onDelete={() => handleDelete(song)}
-                      />
-                    ))}
-                  </div>
+
+                  {/* ── All Songs ── */}
+                  {nonFavorites.length > 0 && (
+                    <div>
+                      <p className="section-label" style={{ paddingLeft: 16, marginBottom: 8 }}>All Songs</p>
+                      <div className="grouped-section">
+                        {nonFavorites.map((song) => (
+                          <SongCard
+                            key={song.id}
+                            song={song}
+                            onOpen={() => setViewSong(song)}
+                            onToggleFavorite={() => handleToggleFavorite(song)}
+                            onDelete={() => handleDelete(song)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Audio uploads ── */}
+                  {audioUploads.length > 0 && (
+                    <div>
+                      <p className="section-label" style={{ paddingLeft: 16, marginBottom: 8 }}>Audio</p>
+                      <div className="grouped-section">
+                        {audioUploads.map((song) => (
+                          <AudioUploadCard
+                            key={song.id}
+                            song={song}
+                            onOpen={() => setViewSong(song)}
+                            onToggleFavorite={() => handleToggleFavorite(song)}
+                            onDelete={() => handleDelete(song)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* When no non-upload content but uploads exist and empty song count otherwise */}
-              {totalNonUpload === 0 && uploads.length > 0 && !query && null}
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -388,7 +447,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
           onClose={() => setViewSong(null)}
           onEdit={(s) => { setEditSong(s); setIsCreating(false); setViewSong(null) }}
           onDeleted={handleDeleted}
-          onDuplicate={handleDuplicate}
           onToggleFavorite={handleToggleFavorite}
         />
       )}
