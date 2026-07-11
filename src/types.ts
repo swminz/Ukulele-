@@ -8,6 +8,16 @@ export interface SongPDF {
   bookmarks: number[]
 }
 
+// ── Audio attachment (uploaded reference track) ────────────────────────
+export interface SongAudio {
+  data:       ArrayBuffer
+  filename:   string
+  size:       number
+  mimeType:   string
+  uploadedAt: number
+  duration?:  number   // seconds, populated lazily after first play
+}
+
 // ── Primary domain object ──────────────────────────────────────────────
 export interface Song {
   id: string
@@ -23,6 +33,8 @@ export interface Song {
   lastPlayedAt?: number  // drives "recently played" sort option
   favorite: boolean
   pdf?: SongPDF          // optional PDF attachment
+  audio?: SongAudio      // optional uploaded audio track
+  isUploaded?: boolean   // true for files added via Upload Music
 }
 
 // ── Legacy shape – kept only for the DB migration path ────────────────
