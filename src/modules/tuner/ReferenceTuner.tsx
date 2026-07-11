@@ -7,7 +7,7 @@ import {
   frequencyToNote,
   type PitchDetectionResult,
 } from "@/lib/pitch"
-import { ChevronDown, Check, Mic, AudioLines } from "lucide-react"
+import { ChevronDown, Check, Mic } from "lucide-react"
 
 // ── Tunings ───────────────────────────────────────────────────────────────────
 interface StringDef { name: string; freq: number; octave: number }
@@ -565,23 +565,6 @@ export function ReferenceTuner() {
         </div>
       )}
 
-      {/* ── Tap-to-start hint (first time only) ── */}
-      {!hasStarted && !micError && (
-        <div style={{ padding: "0 16px calc(var(--safe-bottom) + 10px)", flexShrink: 0 }}>
-          <button
-            onClick={startListening}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-              gap: 10, padding: "14px 16px", borderRadius: 14, border: "none", cursor: "pointer",
-              background: "var(--primary)", color: "#FFFFFF",
-              boxShadow: "0 2px 12px rgba(0,122,255,0.3)",
-            }}
-          >
-            <AudioLines size={20} strokeWidth={2} />
-            <span style={{ fontSize: 15, fontWeight: 600 }}>Start Tuner</span>
-          </button>
-        </div>
-      )}
 
       <style>{`
         @keyframes stringPulse {
