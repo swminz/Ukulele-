@@ -61,7 +61,7 @@ export function SongEditor({ song, isNew, onSave, onCancel }: Props) {
 
   const getCurrentSong = useCallback((): Song => ({
     ...song,
-    title:      title.trim(),
+    title:      title.trim() || "Untitled",
     artist:     artist.trim(),
     album:      album.trim()   || undefined,
     key:        key.trim()     || undefined,
@@ -88,7 +88,7 @@ export function SongEditor({ song, isNew, onSave, onCancel }: Props) {
     } finally { setUploading(false) }
   }
 
-  const canSave = title.trim().length > 0
+  const canSave = true
 
   return (
     <>

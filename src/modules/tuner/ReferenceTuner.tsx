@@ -91,7 +91,7 @@ const STRING_POST = [
   { cx: 144, cy: 52  },
   { cx: 144, cy: 142 },
 ]
-const NUT_X = [78, 91, 109, 122]
+const NUT_X = [86, 95, 105, 114]
 const STRING_PATHS = [
   `M ${NUT_X[0]},177 Q 40,162 16,142`,
   `M ${NUT_X[1]},177 Q 52,115 16,52`,
@@ -186,14 +186,14 @@ function MinimalHeadstock({ selectedString, autoString, inTune, isListening }: H
            Stroke: fully opaque — clearly the neck outline, distinct from strings.
            Strings are drawn after this rect (on top) so they appear 100% solid
            regardless of the fill opacity, in both light and dark themes. */}
-      <rect x={46} y={177} width={108} height={160} rx={4}
+      <rect x={50} y={177} width={100} height={160} rx={4}
         fill="rgba(200,198,195,0.22)"
         stroke="rgba(118,116,114,0.92)"
         strokeWidth={2} />
 
       {/* Fret lines — warm light grey, thinner than outline, distinct from strings */}
       {FRET_Y.map((y) => (
-        <line key={y} x1={46} y1={y} x2={154} y2={y}
+        <line key={y} x1={50} y1={y} x2={150} y2={y}
           stroke="rgba(168,166,163,0.60)" strokeWidth={1.2} />
       ))}
 

@@ -348,8 +348,8 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
                 )
               ) : (
                 <div style={{ paddingTop: 20 }}>
-                  <p style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", color: "var(--foreground)", marginBottom: 16, paddingLeft: 2 }}>
-                    Fingerstyle Music Sheets
+                  <p className="section-label" style={{ paddingLeft: 16, marginBottom: 8 }}>
+                    Music Notes
                   </p>
                   <div className="grouped-section">
                     {sheetUploads.map((song) => (

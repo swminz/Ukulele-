@@ -404,11 +404,9 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--background)" }}>
 
-      {/* ── Top bar: search + add button ── */}
-      <div style={{ padding: "10px 16px 0", flexShrink: 0, display: "flex", gap: 10, alignItems: "center" }}>
-        <div style={{ flex: 1 }}>
-          <SearchBar value={query} onChange={setQuery} />
-        </div>
+      {/* ── Top bar: add button above search (prevents accidental tab taps) ── */}
+      <div style={{ padding: "10px 16px 0", flexShrink: 0 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
         <button
           onClick={() => setShowAdd(true)}
           aria-label="Add custom chord"
@@ -428,6 +426,8 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
         >
           <Plus size={20} strokeWidth={2.2} style={{ color: "#FFF" }} />
         </button>
+        </div>
+        <SearchBar value={query} onChange={setQuery} />
       </div>
 
       {/* ── Underline tab bar ── */}

@@ -37,6 +37,7 @@ export function PDFViewer({ pdf, songId, onClose, onMetaChange }: Props) {
   const saveTimerRef    = useRef<number | null>(null)
   const pinchRef        = useRef<{ startDistance: number; startScale: number } | null>(null)
   const tapRef          = useRef(0)
+  const initialPageRef  = useRef(Math.max(1, pdf.lastViewedPage || 1))
 
   const pageNumbers = useMemo(() => Array.from({ length: numPages }, (_, i) => i + 1), [numPages])
 
@@ -73,7 +74,14 @@ export function PDFViewer({ pdf, songId, onClose, onMetaChange }: Props) {
       await task.promise
       renderTasksRef.current.delete(pageNum)
     } catch (err: unknown) {
-      const isCancel = err && typeof err === "object" && "name" in err && (err as { name: string }).name === "RenderingCancelledException"
+      const errName =
+        err && typeof err === "object" && "name" in err
+          ? (err as { name: string }).name
+          : ""
+      const isCancel =
+        errName === "RenderingCancelledException" ||
+        errName === "AbortException" ||
+        errName === "AbortError"
       if (!isCancel) setRenderError(true)
     }
   }, [doc])
@@ -84,17 +92,18 @@ export function PDFViewer({ pdf, songId, onClose, onMetaChange }: Props) {
     let timer: number | null = null
     const renderScale = Math.max(0.7, Math.min(3.5, scale))
 
-    // Prioritize current page for instant visible feedback.
-    const orderedPages = [currentPage, ...pageNumbers.filter((n) => n !== currentPage)]
+    // Prioritize initial page for instant visible feedback.
+    const firstPage = Math.min(Math.max(1, initialPageRef.current), numPages)
+    const orderedPages = [firstPage, ...pageNumbers.filter((n) => n !== firstPage)]
 
     // Render current page immediately (awaited), then progressively chunk the rest.
     const run = async () => {
-      const firstCanvas = pageRefs.current.get(currentPage)
-      if (firstCanvas) await renderSingle(currentPage, firstCanvas, renderScale)
+      const firstCanvas = pageRefs.current.get(firstPage)
+      if (firstCanvas) await renderSingle(firstPage, firstCanvas, renderScale)
       if (cancelled) return
 
       let idx = 0
-      const remaining = orderedPages.filter((n) => n !== currentPage)
+      const remaining = orderedPages.filter((n) => n !== firstPage)
       const pump = () => {
         if (cancelled) return
         const chunkSize = 2
@@ -124,7 +133,7 @@ export function PDFViewer({ pdf, songId, onClose, onMetaChange }: Props) {
       cancelled = true
       if (timer !== null) window.clearTimeout(timer)
     }
-  }, [doc, numPages, pageNumbers, renderSingle, scale, currentPage, showThumbs])
+  }, [doc, numPages, pageNumbers, renderSingle, scale, showThumbs])
 
   // Persist page + bookmarks
   const persistMeta = useCallback(async (patch: Partial<SongPDF>) => {
