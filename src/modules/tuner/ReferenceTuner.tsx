@@ -357,7 +357,7 @@ function HorizontalMeter({ detuneHz, isActive, inTune }: MeterProps) {
   const hzClamped = Math.max(-NEEDLE_HZ_RANGE, Math.min(NEEDLE_HZ_RANGE, detuneHz))
   const needleDeg = isActive
     ? (hzClamped / NEEDLE_HZ_RANGE) * (sweepDeg / 2)
-    : 2 // idle: almost zero, slight right bias
+    : 0 // idle: perfectly centered vertical needle
   // ±5 cents visual zone (meter display only — in-tune detection uses ±1 Hz)
   const ZONE_CENTS = 5
   const zoneHW  = (ZONE_CENTS / METER_RANGE) * cx
@@ -426,7 +426,7 @@ function HorizontalMeter({ detuneHz, isActive, inTune }: MeterProps) {
           y1={pivotY}
           x2={cx}
           y2={arcPeakY - 2}
-          stroke={isActive ? (inTune ? "#34C759" : "var(--primary)") : "rgba(60,60,67,0.35)"}
+          stroke={isActive ? (inTune ? "#34C759" : "var(--primary)") : "var(--text-tertiary)"}
           strokeWidth={2}
           strokeLinecap="round"
           style={{ transition: "stroke 0.3s ease" }}
@@ -436,7 +436,7 @@ function HorizontalMeter({ detuneHz, isActive, inTune }: MeterProps) {
         cx={cx}
         cy={pivotY}
         r={3.5}
-        fill={isActive ? (inTune ? "#34C759" : "var(--primary)") : "rgba(60,60,67,0.35)"}
+        fill={isActive ? (inTune ? "#34C759" : "var(--primary)") : "var(--text-tertiary)"}
         style={{ transition: "fill 0.3s ease" }}
       />
     </svg>
