@@ -68,8 +68,10 @@ interface WheelProps {
 }
 
 function TempoWheel({ bpm, running, beat, onBpmChange, onToggle }: WheelProps) {
-  const svgRef    = useRef<SVGSVGElement>(null)
-  const dragging  = useRef(false)
+  const svgRef        = useRef<SVGSVGElement>(null)
+  const dragging      = useRef(false)
+  // Track last BPM that triggered haptic so we only fire once per integer step
+  const lastHapticBpm = useRef(bpm)
 
   const handleDeg  = bpmToDeg(bpm)
   const { x: hx, y: hy } = degToXY(handleDeg, R_HANDLE)
@@ -86,7 +88,7 @@ function TempoWheel({ bpm, running, beat, onBpmChange, onToggle }: WheelProps) {
     return { x1, y1, x2, y2, major, filled }
   })
 
-  // Convert pointer position → BPM
+  // Convert pointer position → BPM; fires a subtle haptic tick per BPM integer step
   function pointerToBpm(e: React.PointerEvent<SVGSVGElement>) {
     const svg  = svgRef.current
     if (!svg) return
@@ -96,7 +98,13 @@ function TempoWheel({ bpm, running, beat, onBpmChange, onToggle }: WheelProps) {
     let angle  = Math.atan2(svgX, -svgY) * (180 / Math.PI)   // 0°=top, cw+
     angle      = Math.max(START_DEG, Math.min(-START_DEG, angle))
     const raw  = MIN_BPM + ((angle - START_DEG) / 270) * (MAX_BPM - MIN_BPM)
-    onBpmChange(Math.round(Math.max(MIN_BPM, Math.min(MAX_BPM, raw))))
+    const next = Math.round(Math.max(MIN_BPM, Math.min(MAX_BPM, raw)))
+    if (next !== lastHapticBpm.current) {
+      // Light tick — same feel as the metronome beat, slightly softer
+      haptic(next % 5 === 0 ? 8 : 4)
+      lastHapticBpm.current = next
+    }
+    onBpmChange(next)
   }
 
   // Beat ring pulse: flash the outer track circle on each beat
