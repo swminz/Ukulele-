@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react"
 import { CHORDS, type ChordData } from "./chords"
 import { ChordDiagram } from "./ChordDiagram"
-import { X, Search, Heart, Clock, ChevronLeft } from "lucide-react"
+import { X, Search, Heart, ChevronLeft } from "lucide-react"
 
 const LS_RECENT    = "uke_chords_recent"
 const LS_FAVORITES = "uke_chords_favorites"
@@ -72,8 +72,11 @@ function SearchBar({ value, onChange }: { value: string; onChange: (v: string) =
   )
 }
 
+type LibTab = "all" | "favorites" | "recent"
+
 export function ChordLibrary({ initialChord, onClose }: Props) {
   const [query,     setQuery]     = useState(initialChord ?? "")
+  const [tab,       setTab]       = useState<LibTab>("all")
   const [selected,  setSelected]  = useState<ChordData | null>(
     initialChord ? (CHORDS.find((c) => c.name === initialChord) ?? null) : null,
   )
@@ -89,10 +92,6 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
     e?.stopPropagation()
     setFavorites(toggleFavoriteLS(name))
   }, [])
-
-  const filtered = query
-    ? CHORDS.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
-    : CHORDS
 
   const recentChords   = recent.map((n)    => CHORDS.find((c) => c.name === n)).filter(Boolean) as ChordData[]
   const favoriteChords = favorites.map((n) => CHORDS.find((c) => c.name === n)).filter(Boolean) as ChordData[]
@@ -235,64 +234,83 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
     )
   }
 
+  // ── Filtered pools per tab ────────────────────────────────────────
+  const q = query.toLowerCase()
+  const allFiltered      = q ? CHORDS.filter((c) => c.name.toLowerCase().includes(q)) : CHORDS
+  const favsFiltered     = q ? favoriteChords.filter((c) => c.name.toLowerCase().includes(q)) : favoriteChords
+  const recentFiltered   = q ? recentChords.filter((c) => c.name.toLowerCase().includes(q)) : recentChords
+
   // ── Grid view ─────────────────────────────────────────────────────
-  const showSections = !query && (recentChords.length > 0 || favoriteChords.length > 0)
+  const TABS: { id: LibTab; label: string }[] = [
+    { id: "all",       label: "All Chords"      },
+    { id: "favorites", label: "Favourites"       },
+    { id: "recent",    label: "Recently Viewed"  },
+  ]
+
+  const activeChords =
+    tab === "favorites" ? favsFiltered :
+    tab === "recent"    ? recentFiltered :
+                          allFiltered
+
+  const emptyMsg =
+    q                    ? `No results for "${query}"` :
+    tab === "favorites"  ? "No favourites yet" :
+    tab === "recent"     ? "No recently viewed chords" :
+                           "No chords found"
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--background)" }}>
       {/* Search */}
-      <div style={{ padding: "10px 16px 12px", flexShrink: 0 }}>
+      <div style={{ padding: "10px 16px 0", flexShrink: 0 }}>
         <SearchBar value={query} onChange={setQuery} />
       </div>
 
+      {/* ── Underline tab bar ── */}
+      <div style={{ display: "flex", flexShrink: 0, borderBottom: "1px solid var(--separator)", marginTop: 6 }}>
+        {TABS.map(({ id, label }) => {
+          const active = tab === id
+          return (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              aria-pressed={active}
+              style={{
+                flex:          1,
+                padding:       "13px 0 11px",
+                background:    "none",
+                border:        "none",
+                borderBottom:  active ? "2px solid var(--primary)" : "2px solid transparent",
+                marginBottom:  -1,
+                color:         active ? "var(--primary)" : "var(--text-tertiary)",
+                fontSize:      13,
+                fontWeight:    active ? 600 : 400,
+                letterSpacing: "-0.1px",
+                cursor:        "pointer",
+                transition:    "color 0.15s ease, border-color 0.15s ease",
+                whiteSpace:    "nowrap",
+              }}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
+
       {/* Grid */}
-      <div className="scroll-content" style={{ flex: 1, overflowY: "auto", padding: "0 16px calc(var(--safe-bottom) + 32px)" }}>
-        {filtered.length === 0 ? (
+      <div className="scroll-content" style={{ flex: 1, overflowY: "auto", padding: "16px 16px calc(var(--safe-bottom) + 32px)" }}>
+        {activeChords.length === 0 ? (
           <div style={{ paddingTop: 64, textAlign: "center" }}>
-            <p style={{ fontSize: 17, color: "var(--text-tertiary)" }}>
-              No results for "{query}"
-            </p>
+            <p style={{ fontSize: 17, color: "var(--text-tertiary)" }}>{emptyMsg}</p>
+            {!q && (tab === "favorites" || tab === "recent") && (
+              <p style={{ fontSize: 15, color: "var(--text-tertiary)", marginTop: 6, opacity: 0.7 }}>
+                {tab === "favorites" ? "Tap the heart on any chord to save it." : "Open a chord to add it here."}
+              </p>
+            )}
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {showSections && favoriteChords.length > 0 && (
-              <Section label="Favorites" icon={<Heart size={11} fill="var(--primary)" style={{ color: "var(--primary)" }} />}>
-                <ChordGrid chords={favoriteChords} favorites={favorites} onOpen={openChord} onToggleFav={toggleFav} />
-              </Section>
-            )}
-            {showSections && recentChords.length > 0 && (
-              <Section label="Recently Viewed" icon={<Clock size={11} style={{ color: "var(--text-tertiary)" }} />}>
-                <ChordGrid chords={recentChords} favorites={favorites} onOpen={openChord} onToggleFav={toggleFav} />
-              </Section>
-            )}
-            <Section label={showSections ? "All Chords" : undefined}>
-              <ChordGrid chords={filtered} favorites={favorites} onOpen={openChord} onToggleFav={toggleFav} />
-            </Section>
-          </div>
+          <ChordGrid chords={activeChords} favorites={favorites} onOpen={openChord} onToggleFav={toggleFav} />
         )}
       </div>
-    </div>
-  )
-}
-
-function Section({
-  label,
-  icon,
-  children,
-}: {
-  label?: string
-  icon?: React.ReactNode
-  children: React.ReactNode
-}) {
-  return (
-    <div>
-      {label && (
-        <div style={{ display: "flex", alignItems: "center", gap: 5, paddingLeft: 4, marginBottom: 8 }}>
-          {icon}
-          <p className="section-label">{label}</p>
-        </div>
-      )}
-      {children}
     </div>
   )
 }
