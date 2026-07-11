@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { getAllSongs, saveSong } from "@/lib/db"
+import { getAllSongs, saveSong, deleteSong } from "@/lib/db"
 import { haptic } from "@/lib/audio"
 import type { Song, SongPDF, SongAudio } from "@/types"
 import { SongCard } from "./SongCard"
@@ -69,13 +69,21 @@ interface Props {
   uploadTrigger?: number
 }
 
+// Pending duplicate info (kept in state while the action sheet is shown)
+interface DuplicatePending {
+  file:         File
+  data:         ArrayBuffer
+  existingSong: Song
+}
+
 export function ChordLog({ addTrigger, uploadTrigger }: Props) {
-  const [songs,      setSongs]    = useState<Song[]>([])
-  const [query,      setQuery]    = useState("")
-  const [viewSong,   setViewSong] = useState<Song | null>(null)
-  const [editSong,   setEditSong] = useState<Song | null>(null)
-  const [isCreating, setIsCreating] = useState(false)
-  const [uploading,  setUploading]  = useState(false)
+  const [songs,            setSongs]           = useState<Song[]>([])
+  const [query,            setQuery]           = useState("")
+  const [viewSong,         setViewSong]        = useState<Song | null>(null)
+  const [editSong,         setEditSong]        = useState<Song | null>(null)
+  const [isCreating,       setIsCreating]      = useState(false)
+  const [uploading,        setUploading]       = useState(false)
+  const [duplicatePending, setDuplicatePending] = useState<DuplicatePending | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -100,71 +108,81 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
     fileInputRef.current?.click()
   }, [uploadTrigger])
 
+  // ── Build a Song object from a File + its ArrayBuffer ────────────────
+  function buildSong(file: File, data: ArrayBuffer): Song | null {
+    const now   = Date.now()
+    const title = file.name.replace(/\.[^.]+$/, "")
+    if (isPDF(file.name)) {
+      const pdf: SongPDF = {
+        data, filename: file.name, size: file.size,
+        uploadedAt: now, lastViewedPage: 1, bookmarks: [],
+      }
+      return { id: makeId(), title, artist: "", content: "", createdAt: now, modifiedAt: now, favorite: false, isUploaded: true, pdf }
+    }
+    if (isAudio(file.name)) {
+      const audio: SongAudio = {
+        data, filename: file.name, size: file.size,
+        mimeType: file.type || "audio/mpeg", uploadedAt: now,
+      }
+      return { id: makeId(), title, artist: "", content: "", createdAt: now, modifiedAt: now, favorite: false, isUploaded: true, audio }
+    }
+    return null   // unsupported type
+  }
+
   // ── File selected from picker ─────────────────────────────────────────
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
     if (!files.length) return
-    e.target.value = ""  // reset so same file can be re-picked
+    e.target.value = ""
 
     setUploading(true)
     try {
       for (const file of files) {
+        // Check for an existing upload with the same filename
+        const existing = songs.find((s) =>
+          s.isUploaded && (
+            s.pdf?.filename   === file.name ||
+            s.audio?.filename === file.name
+          )
+        )
         const data = await file.arrayBuffer()
-        const now  = Date.now()
-        const title = file.name.replace(/\.[^.]+$/, "")   // strip extension
 
-        let song: Song
-
-        if (isPDF(file.name)) {
-          const pdf: SongPDF = {
-            data,
-            filename:      file.name,
-            size:          file.size,
-            uploadedAt:    now,
-            lastViewedPage:1,
-            bookmarks:     [],
-          }
-          song = {
-            id:         makeId(),
-            title,
-            artist:     "",
-            content:    "",
-            createdAt:  now,
-            modifiedAt: now,
-            favorite:   false,
-            isUploaded: true,
-            pdf,
-          }
-        } else if (isAudio(file.name)) {
-          const audio: SongAudio = {
-            data,
-            filename:   file.name,
-            size:       file.size,
-            mimeType:   file.type || "audio/mpeg",
-            uploadedAt: now,
-          }
-          song = {
-            id:         makeId(),
-            title,
-            artist:     "",
-            content:    "",
-            createdAt:  now,
-            modifiedAt: now,
-            favorite:   false,
-            isUploaded: true,
-            audio,
-          }
-        } else {
-          continue   // unsupported type — skip silently
+        if (existing) {
+          // Pause and ask the user what to do
+          setDuplicatePending({ file, data, existingSong: existing })
+          return  // remaining files deferred until dialog resolves
         }
 
-        await saveSong(song)
+        const song = buildSong(file, data)
+        if (song) await saveSong(song)
       }
     } finally {
       setUploading(false)
       await load()
     }
   }
+
+  // ── Duplicate dialog handlers ─────────────────────────────────────────
+  const handleReplaceExisting = async () => {
+    if (!duplicatePending) return
+    const { file, data, existingSong } = duplicatePending
+    setDuplicatePending(null)
+    await deleteSong(existingSong.id)
+    const song = buildSong(file, data)
+    if (song) await saveSong(song)
+    await load()
+  }
+
+  const handleKeepBoth = async () => {
+    if (!duplicatePending) return
+    const { file, data } = duplicatePending
+    setDuplicatePending(null)
+    const song = buildSong(file, data)
+    if (song) await saveSong(song)
+    await load()
+  }
+
+  const handleCancelDuplicate = () => setDuplicatePending(null)
 
   // ── Derived lists ─────────────────────────────────────────────────────
   const filtered = songs.filter((s) => {
@@ -362,6 +380,87 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
           onDuplicate={handleDuplicate}
           onToggleFavorite={handleToggleFavorite}
         />
+      )}
+
+      {/* ── Duplicate file action sheet ─────────────────────────────────── */}
+      {duplicatePending && (
+        <>
+          {/* Scrim */}
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.32)" }}
+            onClick={handleCancelDuplicate}
+          />
+
+          {/* iOS-style action sheet */}
+          <div
+            role="alertdialog"
+            aria-modal
+            aria-label="File already exists"
+            style={{
+              position:  "fixed",
+              bottom:    0,
+              left:      0,
+              right:     0,
+              zIndex:    301,
+              padding:   "0 10px calc(env(safe-area-inset-bottom) + 10px)",
+              animation: "sheetUp 0.22s cubic-bezier(0.22,1,0.36,1)",
+            }}
+          >
+            {/* Main group */}
+            <div style={{ background: "var(--card)", borderRadius: 14, overflow: "hidden", marginBottom: 10 }}>
+
+              {/* Header */}
+              <div style={{ padding: "16px 16px 14px", textAlign: "center", borderBottom: "0.5px solid var(--separator)" }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "var(--foreground)", marginBottom: 4 }}>
+                  File Already Exists
+                </p>
+                <p style={{ fontSize: 13, color: "var(--text-tertiary)", lineHeight: "18px" }}>
+                  "{duplicatePending.file.name}" has already been uploaded.
+                  What would you like to do?
+                </p>
+              </div>
+
+              {/* Replace Existing — primary */}
+              <button
+                onClick={handleReplaceExisting}
+                style={{
+                  width: "100%", padding: "15px 16px", background: "transparent",
+                  border: "none", borderBottom: "0.5px solid var(--separator)",
+                  fontSize: 17, fontWeight: 600, color: "var(--primary)",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                Replace Existing
+              </button>
+
+              {/* Keep Both */}
+              <button
+                onClick={handleKeepBoth}
+                style={{
+                  width: "100%", padding: "15px 16px", background: "transparent",
+                  border: "none",
+                  fontSize: 17, fontWeight: 400, color: "var(--foreground)",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                Keep Both
+              </button>
+            </div>
+
+            {/* Cancel — separate pill */}
+            <button
+              onClick={handleCancelDuplicate}
+              style={{
+                width: "100%", padding: "15px 16px", background: "var(--card)",
+                border: "none", borderRadius: 14,
+                fontSize: 17, fontWeight: 600, color: "var(--primary)",
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
       )}
     </>
   )
