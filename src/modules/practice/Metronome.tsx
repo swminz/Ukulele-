@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { createMetronomeClick, haptic } from "@/lib/audio"
 import { useSettings } from "@/hooks/use-settings"
-import { ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 const MIN_BPM = 40
 const MAX_BPM = 220
@@ -376,6 +376,7 @@ export function Metronome() {
             WebkitTapHighlightColor: "transparent",
           }}
         >
+          <ChevronLeft size={15} strokeWidth={2} style={{ color: "var(--text-tertiary)", opacity: 0.5 }} />
           <span style={{ fontSize: 17, fontWeight: 600, color: "var(--foreground)" }}>
             {timeSig} / 4
           </span>
