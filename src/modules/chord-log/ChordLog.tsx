@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { getAllSongs, saveSong, deleteSong, updateSongPDFParsedText } from "@/lib/db"
-import { extractPDFText } from "@/lib/pdf-text"
+import { getAllSongs, saveSong, deleteSong } from "@/lib/db"
 import { haptic } from "@/lib/audio"
 import type { Song, SongPDF, SongAudio } from "@/types"
 import { SongCard } from "./SongCard"
@@ -113,7 +112,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
   }, [uploadTrigger])
 
   // ── Build a Song object from a File + its ArrayBuffer ────────────────
-  // NOTE: PDF text extraction runs in background AFTER save so uploads stay fast.
   function buildSong(file: File, data: ArrayBuffer): Song | null {
     const now   = Date.now()
     const title = file.name.replace(/\.[^.]+$/, "")
@@ -121,7 +119,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
       const pdf: SongPDF = {
         data, filename: file.name, size: file.size,
         uploadedAt: now, lastViewedPage: 1, bookmarks: [],
-        parsedText: "",
       }
       return { id: makeId(), title, artist: "", content: "", createdAt: now, modifiedAt: now, favorite: false, isUploaded: true, pdf }
     }
@@ -133,24 +130,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
       return { id: makeId(), title, artist: "", content: "", createdAt: now, modifiedAt: now, favorite: false, isUploaded: true, audio }
     }
     return null   // unsupported type
-  }
-
-  const parseAndPersistPDFText = async (songId: string, data: ArrayBuffer) => {
-    try {
-      const parsedText = await extractPDFText(data)
-      if (!parsedText.trim()) return
-      await updateSongPDFParsedText(songId, parsedText)
-      // Keep list state fresh if user is still on this screen.
-      setSongs((prev) =>
-        prev.map((s) =>
-          s.id === songId && s.pdf
-            ? { ...s, modifiedAt: Date.now(), pdf: { ...s.pdf, parsedText } }
-            : s,
-        ),
-      )
-    } catch {
-      // Silent fallback: user can always open original PDF layout.
-    }
   }
 
   // ── File selected from picker ─────────────────────────────────────────
@@ -180,7 +159,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
         const song = buildSong(file, data)
         if (song) {
           await saveSong(song)
-          if (song.pdf) void parseAndPersistPDFText(song.id, data)
         }
       }
     } finally {
@@ -198,7 +176,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
     const song = buildSong(file, data)
     if (song) {
       await saveSong(song)
-      if (song.pdf) void parseAndPersistPDFText(song.id, data)
     }
     await load()
   }
@@ -210,7 +187,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
     const song = buildSong(file, data)
     if (song) {
       await saveSong(song)
-      if (song.pdf) void parseAndPersistPDFText(song.id, data)
     }
     await load()
   }

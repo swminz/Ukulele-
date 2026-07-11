@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import type { Song, SongPDF } from "@/types"
-import { deleteSong, saveSong } from "@/lib/db"
-import { extractPDFText } from "@/lib/pdf-text"
+import { deleteSong } from "@/lib/db"
 import { Edit3, Trash2, Heart, Share2, Play, Pause, FileText, Music2, ChevronLeft } from "lucide-react"
 import { haptic } from "@/lib/audio"
 import { useSettings } from "@/hooks/use-settings"
@@ -21,7 +20,6 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onTog
   const [song,             setSong]             = useState(initialSong)
   const [segment,          setSegment]          = useState<Segment>("chords")
   const [pdfOpen,          setPdfOpen]          = useState(false)
-  const [parsingSheetText, setParsingSheetText] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [shareToast,       setShareToast]       = useState(false)
   const [fontSize,         setFontSize]         = useState(() => Number(localStorage.getItem("uke_song_fontsize") ?? 14))
@@ -94,70 +92,6 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onTog
   const handlePDFMetaChange = (patch: Partial<SongPDF>) => {
     if (!song.pdf) return
     setSong((s) => ({ ...s, pdf: s.pdf ? { ...s.pdf, ...patch } : s.pdf }))
-  }
-
-  // Backfill parser for older uploads that don't yet have parsedText.
-  // This keeps existing PDFs working without requiring re-upload.
-  useEffect(() => {
-    if (!song.pdf) return
-    if (song.pdf.parsedText?.trim()) return
-    let cancelled = false
-
-    const run = async () => {
-      setParsingSheetText(true)
-      try {
-        const parsedText = await extractPDFText(song.pdf!.data)
-        if (cancelled || !parsedText.trim()) return
-        const updated: Song = {
-          ...song,
-          pdf: { ...song.pdf!, parsedText },
-          modifiedAt: Date.now(),
-        }
-        setSong(updated)
-        await saveSong(updated)
-      } catch {
-        // Keep existing fallback UI; don't disrupt normal viewing.
-      } finally {
-        if (!cancelled) setParsingSheetText(false)
-      }
-    }
-
-    void run()
-    return () => { cancelled = true }
-  }, [song])
-
-  const renderChordAwareLine = (line: string, i: number) => {
-    const parts = line.split(/(\[[^\]]+\])/g)
-    return (
-      <p
-        key={`line-${i}`}
-        style={{
-          margin: 0,
-          fontSize: 16,
-          lineHeight: 1.6,
-          fontWeight: 400,
-          color: "var(--foreground)",
-          whiteSpace: "pre-wrap",
-          overflowWrap: "anywhere",
-          wordBreak: "break-word",
-        }}
-      >
-        {parts.map((part, idx) => {
-          const isChord = /^\[[^\]]+\]$/.test(part)
-          return (
-            <span
-              key={`seg-${i}-${idx}`}
-              style={{
-                fontWeight: isChord ? 700 : 400,
-                color: isChord ? "var(--foreground)" : "var(--foreground)",
-              }}
-            >
-              {part}
-            </span>
-          )
-        })}
-      </p>
-    )
   }
 
   return (
@@ -364,31 +298,15 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onTog
                   boxShadow: "0 0 0 1px var(--separator)",
                 }}
               >
-                {song.pdf!.parsedText?.trim() ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    {song.pdf!.parsedText.split("\n").map((line, i) => renderChordAwareLine(line, i))}
-                  </div>
-                ) : parsingSheetText ? (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center", gap: 10 }}>
-                    <FileText size={34} strokeWidth={1.2} style={{ color: "var(--text-tertiary)" }} />
-                    <p style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)", margin: 0 }}>
-                      Preparing readable text...
-                    </p>
-                    <p style={{ fontSize: 14, color: "var(--text-tertiary)", margin: 0, lineHeight: "20px", maxWidth: 280 }}>
-                      You can open the original layout immediately below.
-                    </p>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center", gap: 10 }}>
-                    <FileText size={34} strokeWidth={1.2} style={{ color: "var(--text-tertiary)" }} />
-                    <p style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)", margin: 0 }}>
-                      Could not parse text from this PDF
-                    </p>
-                    <p style={{ fontSize: 14, color: "var(--text-tertiary)", margin: 0, lineHeight: "20px", maxWidth: 280 }}>
-                      You can still open the original PDF layout below.
-                    </p>
-                  </div>
-                )}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center", gap: 10 }}>
+                  <FileText size={34} strokeWidth={1.2} style={{ color: "var(--text-tertiary)" }} />
+                  <p style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)", margin: 0 }}>
+                    Open the original PDF layout
+                  </p>
+                  <p style={{ fontSize: 14, color: "var(--text-tertiary)", margin: 0, lineHeight: "20px", maxWidth: 280 }}>
+                    Fast in-app preview is always available below.
+                  </p>
+                </div>
               </div>
 
               <div
