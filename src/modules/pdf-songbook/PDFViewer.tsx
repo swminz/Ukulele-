@@ -80,15 +80,51 @@ export function PDFViewer({ pdf, songId, onClose, onMetaChange }: Props) {
 
   useEffect(() => {
     if (!doc || numPages === 0) return
-    pageNumbers.forEach((n) => {
-      const c = pageRefs.current.get(n)
-      if (c) void renderSingle(n, c, Math.max(0.7, Math.min(3.5, scale)))
-    })
-    pageNumbers.forEach((n) => {
-      const c = thumbRefs.current.get(n)
-      if (c) void renderSingle(n, c, 0.2)
-    })
-  }, [doc, numPages, pageNumbers, renderSingle, scale])
+    let cancelled = false
+    let timer: number | null = null
+    const renderScale = Math.max(0.7, Math.min(3.5, scale))
+
+    // Prioritize current page for instant visible feedback.
+    const orderedPages = [currentPage, ...pageNumbers.filter((n) => n !== currentPage)]
+
+    // Render current page immediately (awaited), then progressively chunk the rest.
+    const run = async () => {
+      const firstCanvas = pageRefs.current.get(currentPage)
+      if (firstCanvas) await renderSingle(currentPage, firstCanvas, renderScale)
+      if (cancelled) return
+
+      let idx = 0
+      const remaining = orderedPages.filter((n) => n !== currentPage)
+      const pump = () => {
+        if (cancelled) return
+        const chunkSize = 2
+        const end = Math.min(idx + chunkSize, remaining.length)
+        for (; idx < end; idx++) {
+          const n = remaining[idx]
+          const c = pageRefs.current.get(n)
+          if (c) void renderSingle(n, c, renderScale)
+        }
+        if (idx < remaining.length) {
+          timer = window.setTimeout(pump, 30)
+        }
+      }
+      pump()
+
+      // Thumbnails are lower priority; render only when the sidebar is shown.
+      if (showThumbs) {
+        pageNumbers.forEach((n) => {
+          const c = thumbRefs.current.get(n)
+          if (c) void renderSingle(n, c, 0.2)
+        })
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+      if (timer !== null) window.clearTimeout(timer)
+    }
+  }, [doc, numPages, pageNumbers, renderSingle, scale, currentPage, showThumbs])
 
   // Persist page + bookmarks
   const persistMeta = useCallback(async (patch: Partial<SongPDF>) => {
