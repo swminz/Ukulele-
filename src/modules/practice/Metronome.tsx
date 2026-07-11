@@ -100,6 +100,10 @@ function TempoWheel({ bpm, running, beat, onBpmChange, onToggle }: WheelProps) {
     const raw  = MIN_BPM + ((angle - START_DEG) / 270) * (MAX_BPM - MIN_BPM)
     const next = Math.round(Math.max(MIN_BPM, Math.min(MAX_BPM, raw)))
     if (next !== lastHapticBpm.current) {
+      // Audible detent feedback while dragging BPM on the wheel.
+      // Use the same metronome click voice as playback so tuning the tempo
+      // feels consistent even when not running.
+      createMetronomeClick(next % 5 === 0)
       // Light tick — same feel as the metronome beat, slightly softer
       haptic(next % 5 === 0 ? 8 : 4)
       lastHapticBpm.current = next
