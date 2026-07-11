@@ -204,8 +204,8 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
             <Heart
               size={20}
               strokeWidth={1.5}
-              fill={isFav ? "var(--destructive)" : "none"}
-              style={{ color: isFav ? "var(--destructive)" : "var(--text-tertiary)" }}
+              fill={isFav ? "var(--primary)" : "none"}
+              style={{ color: isFav ? "var(--primary)" : "var(--text-tertiary)" }}
             />
           </button>
         </div>
@@ -256,7 +256,7 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {showSections && favoriteChords.length > 0 && (
-              <Section label="Favorites" icon={<Heart size={11} fill="var(--destructive)" style={{ color: "var(--destructive)" }} />}>
+              <Section label="Favorites" icon={<Heart size={11} fill="var(--primary)" style={{ color: "var(--primary)" }} />}>
                 <ChordGrid chords={favoriteChords} favorites={favorites} onOpen={openChord} onToggleFav={toggleFav} />
               </Section>
             )}
@@ -370,8 +370,8 @@ function ChordGrid({
               <Heart
                 size={12}
                 strokeWidth={1.5}
-                fill={isFav ? "var(--destructive)" : "none"}
-                style={{ color: isFav ? "var(--destructive)" : "rgba(120,120,128,0.4)" }}
+                fill={isFav ? "var(--primary)" : "none"}
+                style={{ color: isFav ? "var(--primary)" : "rgba(120,120,128,0.4)" }}
               />
             </button>
           </button>

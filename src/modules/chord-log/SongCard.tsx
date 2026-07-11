@@ -54,9 +54,9 @@ export function SongCard({ song, onOpen, onToggleFavorite, onDelete }: Props) {
         <Heart
           size={16}
           strokeWidth={1.5}
-          fill={song.favorite ? "var(--destructive)" : "none"}
+          fill={song.favorite ? "var(--primary)" : "none"}
           style={{
-            color:      song.favorite ? "var(--destructive)" : "var(--text-tertiary)",
+            color:      song.favorite ? "var(--primary)" : "var(--text-tertiary)",
             transition: "color 0.15s, fill 0.15s",
           }}
         />

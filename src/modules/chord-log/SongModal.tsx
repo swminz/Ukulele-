@@ -150,7 +150,7 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onTog
 
         <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
           <button onClick={handleFavorite} aria-label="Toggle favorite" style={{ background: "none", border: "none", padding: 10, cursor: "pointer", display: "flex", alignItems: "center" }}>
-            <Heart size={20} strokeWidth={1.5} fill={song.favorite ? "var(--destructive)" : "none"} style={{ color: song.favorite ? "var(--destructive)" : "var(--text-tertiary)", transition: "0.15s" }} />
+            <Heart size={20} strokeWidth={1.5} fill={song.favorite ? "var(--primary)" : "none"} style={{ color: song.favorite ? "var(--primary)" : "var(--text-tertiary)", transition: "0.15s" }} />
           </button>
           <button onClick={handleShare} aria-label="Share" style={{ background: "none", border: "none", padding: 10, cursor: "pointer", display: "flex", alignItems: "center" }}>
             <Share2 size={20} strokeWidth={1.5} style={{ color: shareToast ? "var(--success)" : "var(--text-tertiary)" }} />

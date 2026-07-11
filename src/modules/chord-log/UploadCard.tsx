@@ -115,8 +115,8 @@ export function AudioUploadCard({ song, onOpen, onToggleFavorite, onDelete }: Au
           style={{ background: "none", border: "none", padding: "4px 2px", cursor: "pointer", display: "flex", alignItems: "center" }}
         >
           <Heart size={16} strokeWidth={1.5}
-            fill={song.favorite ? "var(--destructive)" : "none"}
-            style={{ color: song.favorite ? "var(--destructive)" : "var(--text-tertiary)", transition: "color 0.15s, fill 0.15s" }} />
+            fill={song.favorite ? "var(--primary)" : "none"}
+            style={{ color: song.favorite ? "var(--primary)" : "var(--text-tertiary)", transition: "color 0.15s, fill 0.15s" }} />
         </button>
         <ChevronRight size={16} strokeWidth={1.8}
           style={{ color: "var(--text-tertiary)", flexShrink: 0, opacity: 0.45, marginLeft: -2 }} />
@@ -168,8 +168,8 @@ export function PDFUploadCard({ song, onOpen, onToggleFavorite, onDelete }: PDFC
         }}
       >
         <Heart size={16} strokeWidth={1.5}
-          fill={song.favorite ? "var(--destructive)" : "none"}
-          style={{ color: song.favorite ? "var(--destructive)" : "var(--text-tertiary)", transition: "color 0.15s, fill 0.15s" }} />
+          fill={song.favorite ? "var(--primary)" : "none"}
+          style={{ color: song.favorite ? "var(--primary)" : "var(--text-tertiary)", transition: "color 0.15s, fill 0.15s" }} />
       </button>
 
       {/* PDF icon */}
