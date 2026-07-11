@@ -348,9 +348,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
                 )
               ) : (
                 <div style={{ paddingTop: 20 }}>
-                  <p className="section-label" style={{ paddingLeft: 16, marginBottom: 8 }}>
-                    Music Notes
-                  </p>
                   <div className="grouped-section">
                     {sheetUploads.map((song) => (
                       <PDFUploadCard
@@ -408,7 +405,6 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
                   {/* ── All Songs ── */}
                   {nonFavorites.length > 0 && (
                     <div>
-                      <p className="section-label" style={{ paddingLeft: 16, marginBottom: 8 }}>All Songs</p>
                       <div className="grouped-section">
                         {nonFavorites.map((song) => (
                           <SongCard
