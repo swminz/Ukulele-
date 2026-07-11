@@ -372,10 +372,10 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onTog
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center", gap: 10 }}>
                     <FileText size={34} strokeWidth={1.2} style={{ color: "var(--text-tertiary)" }} />
                     <p style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)", margin: 0 }}>
-                      Extracting text from PDF...
+                      Preparing readable text...
                     </p>
                     <p style={{ fontSize: 14, color: "var(--text-tertiary)", margin: 0, lineHeight: "20px", maxWidth: 280 }}>
-                      This takes a moment on first open.
+                      You can open the original layout immediately below.
                     </p>
                   </div>
                 ) : (
@@ -391,7 +391,18 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onTog
                 )}
               </div>
 
-              <div style={{ marginTop: 14, display: "flex", justifyContent: "center" }}>
+              <div
+                style={{
+                  marginTop: 14,
+                  display: "flex",
+                  justifyContent: "center",
+                  position: "sticky",
+                  bottom: 0,
+                  paddingTop: 8,
+                  paddingBottom: 4,
+                  background: "linear-gradient(to top, var(--background), transparent)",
+                }}
+              >
                 <button
                   onClick={() => setPdfOpen(true)}
                   style={{

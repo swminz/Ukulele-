@@ -129,6 +129,18 @@ export async function updateSongPDFMeta(
   })
 }
 
+/** Persist parsed PDF text without mutating other song fields. */
+export async function updateSongPDFParsedText(songId: string, parsedText: string): Promise<void> {
+  const database = await getDB()
+  const song = await database.get("songs", songId)
+  if (!song?.pdf) return
+  await database.put("songs", {
+    ...song,
+    modifiedAt: Date.now(),
+    pdf: { ...song.pdf, parsedText },
+  })
+}
+
 // ── Backup / Restore ───────────────────────────────────────────────────
 
 export async function exportBackup(): Promise<string> {
