@@ -7,7 +7,7 @@ import {
   frequencyToNote,
   type PitchDetectionResult,
 } from "@/lib/pitch"
-import { ChevronDown, Check, Mic, AudioLines } from "lucide-react"
+import { ChevronDown, Check, Mic } from "lucide-react"
 
 // ── Tunings ──────────────────────────────────────────────────────────────────
 interface StringDef { name: string; freq: number; octave: number }
@@ -606,52 +606,27 @@ export function ReferenceTuner() {
         </div>
       </div>
 
-      {/* ── Instruction / mic error card ── */}
-      <div style={{ padding: "8px 16px calc(var(--safe-bottom) + 8px)", flexShrink: 0 }}>
-        {micError ? (
+      {/* ── Mic error banner (only shown when mic access is denied) ── */}
+      {micError && (
+        <div style={{ padding: "0 16px calc(var(--safe-bottom) + 10px)", flexShrink: 0 }}>
           <div style={{
-            background: "var(--card)", borderRadius: 14, padding: "14px 16px",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            boxShadow: "0 1px 8px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.04)",
+            background: "rgba(255,59,48,0.08)", borderRadius: 12, padding: "12px 14px",
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Mic size={20} strokeWidth={1.5} style={{ color: "var(--destructive)" }} />
-              <div>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "var(--foreground)", margin: 0 }}>
-                  Microphone access required
-                </p>
-                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0, marginTop: 1 }}>Tap to try again</p>
-              </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Mic size={18} strokeWidth={1.5} style={{ color: "var(--destructive)", flexShrink: 0 }} />
+              <p style={{ fontSize: 14, fontWeight: 500, color: "var(--destructive)", margin: 0 }}>
+                Microphone access required
+              </p>
             </div>
             <button onClick={startListening} style={{
-              background: "var(--primary)", color: "#FFFFFF", border: "none",
-              borderRadius: 8, padding: "6px 14px", fontSize: 14, fontWeight: 600,
+              background: "var(--destructive)", color: "#FFFFFF", border: "none",
+              borderRadius: 8, padding: "5px 12px", fontSize: 13, fontWeight: 600,
               cursor: "pointer", flexShrink: 0,
             }}>Allow</button>
           </div>
-        ) : (
-          <div style={{
-            background: "var(--card)", borderRadius: 14, padding: "14px 16px",
-            display: "flex", alignItems: "center", gap: 14,
-            boxShadow: "0 1px 8px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.04)",
-          }}>
-            <AudioLines size={28} strokeWidth={1.5} style={{
-              color: "var(--primary)", flexShrink: 0,
-              opacity: isListening ? 1 : 0.4, transition: "opacity 0.3s ease",
-            }} />
-            <div>
-              <p style={{ fontSize: 15, fontWeight: 600, color: "var(--foreground)", margin: 0 }}>
-                {selectedString !== null
-                  ? `Pluck the ${s[selectedString].name} string`
-                  : "Select a string to begin"}
-              </p>
-              <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0, marginTop: 1 }}>
-                {selectedString !== null ? "Listen closely" : "Tap any button above"}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes stringPulse {

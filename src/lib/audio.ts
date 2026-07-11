@@ -113,34 +113,67 @@ export function stopReferenceTone(): void {
 }
 
 // ── Metronome click sound ─────────────────────────────────────────────
+// Two-layer design: a punchy sine-tone body (perceived loudness) +
+// a high-frequency noise transient (attack crispness).
+// A DynamicsCompressor at the output maximises volume headroom.
 export function createMetronomeClick(accent = false): void {
   const context = getCtx()
   if (context.state === "suspended") context.resume()
 
-  const duration = 0.05
-  const bufferSize = Math.ceil(context.sampleRate * duration)
-  const buffer = context.createBuffer(1, bufferSize, context.sampleRate)
-  const data = buffer.getChannelData(0)
+  const now = context.currentTime
 
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 12)
+  // ── Output compressor — pushes perceived loudness to the ceiling ──
+  const comp = context.createDynamicsCompressor()
+  comp.threshold.value = -3     // dBFS
+  comp.knee.value      = 0
+  comp.ratio.value     = 6
+  comp.attack.value    = 0.0005
+  comp.release.value   = 0.08
+  comp.connect(context.destination)
+
+  // ── Master gain ───────────────────────────────────────────────────
+  const master = context.createGain()
+  master.gain.value = accent ? 2.0 : 1.4
+  master.connect(comp)
+
+  // ── Layer 1: sine-tone body (punchy, audible through any mix) ─────
+  const toneFreq = accent ? 1050 : 700
+  const tone = context.createOscillator()
+  tone.type = "sine"
+  tone.frequency.value = toneFreq
+
+  const toneEnv = context.createGain()
+  toneEnv.gain.setValueAtTime(0, now)
+  toneEnv.gain.linearRampToValueAtTime(1.0, now + 0.001)   // instant attack
+  toneEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.06) // fast decay
+
+  tone.connect(toneEnv)
+  toneEnv.connect(master)
+  tone.start(now)
+  tone.stop(now + 0.07)
+
+  // ── Layer 2: high-frequency noise burst (click transient / tick) ──
+  const nBuf  = Math.ceil(context.sampleRate * 0.025)
+  const buf   = context.createBuffer(1, nBuf, context.sampleRate)
+  const data  = buf.getChannelData(0)
+  for (let i = 0; i < nBuf; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nBuf, 6)
   }
 
-  const source = context.createBufferSource()
-  source.buffer = buffer
+  const noise = context.createBufferSource()
+  noise.buffer = buf
 
-  const filter = context.createBiquadFilter()
-  filter.type = "bandpass"
-  filter.frequency.value = accent ? 2400 : 1200
-  filter.Q.value = 0.8
+  const hp = context.createBiquadFilter()
+  hp.type = "highpass"
+  hp.frequency.value = 3500   // keep only the crisp tick portion
 
-  const gain = context.createGain()
-  gain.gain.value = accent ? 0.8 : 0.5
+  const noiseGain = context.createGain()
+  noiseGain.gain.value = accent ? 1.2 : 0.8
 
-  source.connect(filter)
-  filter.connect(gain)
-  gain.connect(context.destination)
-  source.start()
+  noise.connect(hp)
+  hp.connect(noiseGain)
+  noiseGain.connect(master)
+  noise.start(now)
 }
 
 // ── Timer done — gentle bell ──────────────────────────────────────────

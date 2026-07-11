@@ -494,49 +494,8 @@ export function Metronome() {
         </div>
       </div>
 
-      {/* ── Bottom info card ──────────────────────────────────────────── */}
-      <div style={{ padding: "12px 16px calc(var(--safe-bottom) + 12px)", flexShrink: 0 }}>
-        <div
-          style={{
-            background:   "var(--card)",
-            borderRadius: 14,
-            padding:      "14px 16px",
-            display:      "flex",
-            alignItems:   "center",
-            gap:          14,
-            boxShadow:    "0 1px 8px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.04)",
-          }}
-        >
-          {/* Simple metronome icon */}
-          <svg
-            viewBox="0 0 32 40"
-            style={{ width: 28, flexShrink: 0, color: "var(--primary)", opacity: running ? 1 : 0.45, transition: "opacity 0.3s ease" }}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.8}
-            strokeLinecap="round"
-          >
-            <polygon points="4,38 28,38 22,6 10,6" strokeLinejoin="round" />
-            <line x1={16} y1={38} x2={16} y2={8} />
-            {/* Pendulum arm */}
-            <line
-              x1={16} y1={22} x2={24} y2={10}
-              stroke="var(--primary)"
-              strokeWidth={2}
-              style={{ transition: "all 0.3s ease" }}
-            />
-            <circle cx={24} cy={10} r={2.5} fill="var(--primary)" stroke="none" />
-          </svg>
-          <div>
-            <p style={{ fontSize: 15, fontWeight: 600, color: "var(--foreground)", margin: 0 }}>
-              {running ? `${bpm} BPM — ${label}` : "Tap play to start"}
-            </p>
-            <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0, marginTop: 1 }}>
-              Adjust tempo and time signature above
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Safe-area spacer at the bottom */}
+      <div style={{ height: "calc(var(--safe-bottom) + 8px)", flexShrink: 0 }} />
     </div>
   )
 }
