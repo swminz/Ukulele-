@@ -91,7 +91,8 @@ const STRING_POST = [
   { cx: 144, cy: 52  },
   { cx: 144, cy: 142 },
 ]
-const NUT_X = [86, 95, 105, 114]
+// Evenly distribute 4 strings across the slimmer 100px neck (x: 50 -> 150).
+const NUT_X = [68, 89.33, 110.67, 132]
 const STRING_PATHS = [
   `M ${NUT_X[0]},177 Q 40,162 16,142`,
   `M ${NUT_X[1]},177 Q 52,115 16,52`,
