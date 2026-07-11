@@ -270,7 +270,7 @@ export function Metronome() {
       }}
     >
       {/* ── BPM hero + slider ────────────────────────────────────────── */}
-      <div style={{ padding: "8px 20px 0", flexShrink: 0 }}>
+      <div style={{ padding: "16px 20px 0", flexShrink: 0 }}>
 
         {/* Section label */}
         <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 6 }}>
@@ -355,7 +355,8 @@ export function Metronome() {
           style={{
             display:       "flex",
             alignItems:    "center",
-            justifyContent:"space-between",
+            justifyContent:"center",
+            gap:           6,
             width:         "100%",
             background:    "var(--card)",
             border:        "none",
@@ -366,10 +367,10 @@ export function Metronome() {
             WebkitTapHighlightColor: "transparent",
           }}
         >
-          <span style={{ fontSize: 17, fontWeight: 500, color: "var(--foreground)" }}>
+          <span style={{ fontSize: 17, fontWeight: 600, color: "var(--foreground)" }}>
             {timeSig} / 4
           </span>
-          <ChevronRight size={16} strokeWidth={2} style={{ color: "var(--text-tertiary)", opacity: 0.5 }} />
+          <ChevronRight size={15} strokeWidth={2} style={{ color: "var(--text-tertiary)", opacity: 0.5 }} />
         </button>
       </div>
 
@@ -378,7 +379,7 @@ export function Metronome() {
         <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 6 }}>
           Beat Accent
         </p>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {Array.from({ length: timeSig }, (_, i) => i + 1).map((n) => {
             const active = n === accentBeat
             const isBeat = beat === n
@@ -390,26 +391,21 @@ export function Metronome() {
                 aria-pressed={active}
                 style={{
                   flex:         1,
-                  height:       40,
-                  borderRadius: 10,
-                  border:       active ? "none" : "1.5px solid rgba(60,60,67,0.15)",
+                  height:       16,
+                  borderRadius: "50%",
+                  border:       "none",
                   background:   active
                     ? "var(--primary)"
                     : isBeat
-                      ? "rgba(0,122,255,0.08)"
-                      : "var(--card)",
-                  color:        active ? "#FFF" : "var(--foreground)",
-                  fontSize:     15,
-                  fontWeight:   600,
+                      ? "rgba(0,122,255,0.35)"
+                      : "rgba(120,120,128,0.18)",
                   cursor:       "pointer",
                   transition:   "background 0.12s ease, transform 0.06s ease",
-                  transform:    isBeat ? "scale(1.05)" : "scale(1)",
-                  boxShadow:    active ? "0 2px 6px rgba(0,122,255,0.28)" : "0 1px 3px rgba(0,0,0,0.05)",
+                  transform:    isBeat ? "scale(1.25)" : "scale(1)",
+                  padding:      0,
                   WebkitTapHighlightColor: "transparent",
                 }}
-              >
-                {n}
-              </button>
+              />
             )
           })}
         </div>
