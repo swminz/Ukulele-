@@ -270,11 +270,11 @@ export function Metronome() {
       }}
     >
       {/* ── Tempo: label + BPM hero + slider ─────────────────────────── */}
-      <div style={{ padding: "20px 20px 0", flexShrink: 0 }}>
-        <p className="section-label" style={{ paddingLeft: 2, marginBottom: 12 }}>Tempo</p>
+      <div style={{ padding: "12px 20px 0", flexShrink: 0 }}>
+        <p className="section-label" style={{ paddingLeft: 2, marginBottom: 8 }}>Tempo</p>
 
         {/* BPM row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {/* − */}
           <button
             onClick={() => setBpm(bpm - 1)}
@@ -282,22 +282,22 @@ export function Metronome() {
             onPointerUp={(e)   => { (e.currentTarget as HTMLElement).style.transform = "scale(1)" }}
             aria-label="Decrease BPM"
             style={{
-              width: 48, height: 48, borderRadius: 14,
+              width: 42, height: 42, borderRadius: 12,
               background: "var(--card)", border: "none",
-              fontSize: 26, fontWeight: 300, color: "var(--foreground)",
+              fontSize: 24, fontWeight: 300, color: "var(--foreground)",
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
               boxShadow: "0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(60,60,67,0.1)",
               transition: "transform 0.08s ease", flexShrink: 0,
             }}
           >−</button>
 
-          {/* BPM + label */}
+          {/* BPM + labels */}
           <div style={{ flex: 1, textAlign: "center" }}>
             <p
               style={{
-                fontSize:           80,
+                fontSize:           64,
                 fontWeight:         700,
-                letterSpacing:      "-3px",
+                letterSpacing:      "-2px",
                 lineHeight:         1,
                 fontVariantNumeric: "tabular-nums",
                 color:              running ? "var(--primary)" : "var(--foreground)",
@@ -306,27 +306,8 @@ export function Metronome() {
             >
               {bpm}
             </p>
-            <p
-              style={{
-                fontSize:      11,
-                fontWeight:    700,
-                letterSpacing: "2px",
-                textTransform: "uppercase",
-                color:         "var(--text-tertiary)",
-                marginTop:     4,
-              }}
-            >
-              BPM
-            </p>
-            <p
-              style={{
-                fontSize:  14,
-                fontWeight:500,
-                color:     "var(--primary)",
-                marginTop: 4,
-              }}
-            >
-              {label}
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase", color: "var(--text-tertiary)", marginTop: 2 }}>
+              BPM · {label}
             </p>
           </div>
 
@@ -337,9 +318,9 @@ export function Metronome() {
             onPointerUp={(e)   => { (e.currentTarget as HTMLElement).style.transform = "scale(1)" }}
             aria-label="Increase BPM"
             style={{
-              width: 48, height: 48, borderRadius: 14,
+              width: 42, height: 42, borderRadius: 12,
               background: "var(--card)", border: "none",
-              fontSize: 26, fontWeight: 300, color: "var(--foreground)",
+              fontSize: 24, fontWeight: 300, color: "var(--foreground)",
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
               boxShadow: "0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(60,60,67,0.1)",
               transition: "transform 0.08s ease", flexShrink: 0,
@@ -348,7 +329,7 @@ export function Metronome() {
         </div>
 
         {/* Slider */}
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 10 }}>
           <input
             type="range"
             min={MIN_BPM}
@@ -361,7 +342,7 @@ export function Metronome() {
               background: `linear-gradient(to right, var(--primary) ${pct}%, rgba(120,120,128,0.18) 0%)`,
             }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
             <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{MIN_BPM}</span>
             <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{MAX_BPM}</span>
           </div>
@@ -369,8 +350,8 @@ export function Metronome() {
       </div>
 
       {/* ── Time Signature ────────────────────────────────────────────── */}
-      <div style={{ padding: "20px 20px 0", flexShrink: 0 }}>
-        <p className="section-label" style={{ paddingLeft: 2, marginBottom: 10 }}>Time Signature</p>
+      <div style={{ padding: "12px 20px 0", flexShrink: 0 }}>
+        <p className="section-label" style={{ paddingLeft: 2, marginBottom: 6 }}>Time Signature</p>
         <button
           onClick={handleTimeSig}
           aria-label={`Time signature ${timeSig}/4 — tap to cycle`}
@@ -383,56 +364,37 @@ export function Metronome() {
             background:   "var(--card)",
             border:       "none",
             borderRadius: 14,
-            padding:      "14px 16px",
+            padding:      "10px 16px",
             cursor:       "pointer",
             boxShadow:    "0 1px 4px rgba(0,0,0,0.04), 0 0 0 1px rgba(60,60,67,0.08)",
-            minHeight:    76,
+            minHeight:    56,
           }}
         >
-          {/* Fraction — always horizontally centred */}
           <span
             style={{
               display:            "flex",
               alignItems:         "center",
-              gap:                8,
-              fontSize:           56,
+              gap:                6,
+              fontSize:           42,
               fontWeight:         700,
-              letterSpacing:      "-2px",
+              letterSpacing:      "-1.5px",
               lineHeight:         1,
               fontVariantNumeric: "tabular-nums",
               color:              "var(--foreground)",
             }}
           >
             <span>{timeSig}</span>
-            <span
-              style={{
-                fontSize:   44,
-                fontWeight: 300,
-                color:      "var(--text-tertiary)",
-                letterSpacing: 0,
-              }}
-            >/</span>
+            <span style={{ fontSize: 34, fontWeight: 300, color: "var(--text-tertiary)", letterSpacing: 0 }}>/</span>
             <span>4</span>
           </span>
-
-          {/* Chevron anchored to the right edge */}
-          <ChevronRight
-            size={18}
-            strokeWidth={2}
-            style={{
-              position: "absolute",
-              right:    16,
-              color:    "var(--text-tertiary)",
-              opacity:  0.45,
-            }}
-          />
+          <ChevronRight size={16} strokeWidth={2} style={{ position: "absolute", right: 14, color: "var(--text-tertiary)", opacity: 0.45 }} />
         </button>
       </div>
 
       {/* ── Beat Accent ───────────────────────────────────────────────── */}
-      <div style={{ padding: "20px 20px 0", flexShrink: 0 }}>
-        <p className="section-label" style={{ paddingLeft: 2, marginBottom: 10 }}>Beat Accent</p>
-        <div style={{ display: "flex", gap: 10 }}>
+      <div style={{ padding: "12px 20px 0", flexShrink: 0 }}>
+        <p className="section-label" style={{ paddingLeft: 2, marginBottom: 6 }}>Beat Accent</p>
+        <div style={{ display: "flex", gap: 8 }}>
           {Array.from({ length: timeSig }, (_, i) => i + 1).map((n) => {
             const active = n === accentBeat
             const isBeat = beat === n
@@ -443,26 +405,18 @@ export function Metronome() {
                 aria-label={`Accent beat ${n}`}
                 aria-pressed={active}
                 style={{
-                  flex:            1,
-                  height:          52,
-                  borderRadius:    12,
-                  border:          active
-                    ? "none"
-                    : "1.5px solid rgba(60,60,67,0.15)",
-                  background:      active
-                    ? "var(--primary)"
-                    : isBeat
-                      ? "rgba(0,122,255,0.08)"
-                      : "var(--card)",
-                  color:           active ? "#FFFFFF" : "var(--foreground)",
-                  fontSize:        20,
-                  fontWeight:      600,
-                  cursor:          "pointer",
-                  transition:      "background 0.15s ease, transform 0.06s ease",
-                  transform:       isBeat ? "scale(1.08)" : "scale(1)",
-                  boxShadow:       active
-                    ? "0 2px 8px rgba(0,122,255,0.25)"
-                    : "0 1px 3px rgba(0,0,0,0.04)",
+                  flex:         1,
+                  height:       44,
+                  borderRadius: 10,
+                  border:       active ? "none" : "1.5px solid rgba(60,60,67,0.15)",
+                  background:   active ? "var(--primary)" : isBeat ? "rgba(0,122,255,0.08)" : "var(--card)",
+                  color:        active ? "#FFFFFF" : "var(--foreground)",
+                  fontSize:     18,
+                  fontWeight:   600,
+                  cursor:       "pointer",
+                  transition:   "background 0.15s ease, transform 0.06s ease",
+                  transform:    isBeat ? "scale(1.08)" : "scale(1)",
+                  boxShadow:    active ? "0 2px 8px rgba(0,122,255,0.25)" : "0 1px 3px rgba(0,0,0,0.04)",
                 }}
               >
                 {n}
@@ -479,11 +433,11 @@ export function Metronome() {
           display:         "flex",
           alignItems:      "center",
           justifyContent:  "center",
-          padding:         "16px 32px 0",
+          padding:         "10px 24px 0",
           minHeight:       0,
         }}
       >
-        <div style={{ width: "100%", maxWidth: 280 }}>
+        <div style={{ width: "100%", maxWidth: 300 }}>
           <TempoWheel
             bpm={bpm}
             running={running}

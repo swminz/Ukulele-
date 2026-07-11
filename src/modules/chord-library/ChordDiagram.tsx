@@ -2,14 +2,14 @@ import type { ChordData } from "./chords"
 
 interface Props {
   chord: ChordData
-  size?: "sm" | "md" | "lg"
+  size?: "sm" | "md" | "lg" | "xl"
 }
 
 const STRING_LABELS = ["G", "C", "E", "A"]
 const COLORS = { dot: "var(--primary)", open: "none", barre: "var(--primary)", text: "var(--primary-foreground)" }
 
 export function ChordDiagram({ chord, size = "md" }: Props) {
-  const scale = size === "sm" ? 0.8 : size === "lg" ? 1.3 : 1
+  const scale = size === "sm" ? 0.8 : size === "lg" ? 1.3 : size === "xl" ? 2.6 : 1
   const W = Math.round(110 * scale)
   const H = Math.round(130 * scale)
 

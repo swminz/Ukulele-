@@ -55,24 +55,24 @@ type TuneStatus = "idle" | "listening" | "flat" | "sharp" | "intune"
 //   TOP pegs (C / E): cy = 52
 //   BOT pegs (G / A): cy = 142
 //
-// At HS_W=170 px → HS_H = 170 * (300/200) = 255 px
-// TOP_PEG_Y = 255 * (52/300) ≈ 44 px
-// BOT_PEG_Y = 255 * (142/300) ≈ 120 px
+// At HS_W=220 px → HS_H = 220 * (300/200) = 330 px
+// TOP_PEG_Y = 330 * (52/300) ≈ 57 px
+// BOT_PEG_Y = 330 * (142/300) ≈ 156 px
 // btn_half   = 52 / 2 = 26 px
-// TOP_PAD    = 44 - 26 = 18 px   (paddingTop on the button column)
-// BTN_GAP    = 120 - 44 - 52 = 24 px  (gap between C and G buttons)
+// TOP_PAD    = 57 - 26 = 31 px   (paddingTop on the button column)
+// BTN_GAP    = 156 - 57 - 52 = 47 px (gap between C and G buttons)
 
-const HS_W       = 170
+const HS_W       = 220
 const VIEWBOX_H  = 300
 const VIEWBOX_W  = 200
-const PEG_TOP_VB = 52         // cy of C / E pegs in the viewBox
-const PEG_BOT_VB = 142        // cy of G / A pegs in the viewBox
-const HS_H       = HS_W * VIEWBOX_H / VIEWBOX_W         // 255
-const TOP_PEG_Y  = HS_H * PEG_TOP_VB / VIEWBOX_H       // ≈ 44
-const BOT_PEG_Y  = HS_H * PEG_BOT_VB / VIEWBOX_H       // ≈ 120
+const PEG_TOP_VB = 52
+const PEG_BOT_VB = 142
+const HS_H       = HS_W * VIEWBOX_H / VIEWBOX_W         // 330
+const TOP_PEG_Y  = HS_H * PEG_TOP_VB / VIEWBOX_H       // ≈ 57
+const BOT_PEG_Y  = HS_H * PEG_BOT_VB / VIEWBOX_H       // ≈ 156
 const BTN_HALF   = 26
-const TOP_PAD    = Math.max(0, TOP_PEG_Y - BTN_HALF)   // ≈ 18
-const BTN_GAP    = BOT_PEG_Y - TOP_PEG_Y - 52          // ≈ 24
+const TOP_PAD    = Math.max(0, TOP_PEG_Y - BTN_HALF)   // ≈ 31
+const BTN_GAP    = BOT_PEG_Y - TOP_PEG_Y - 52          // ≈ 47
 
 // ── Headstock SVG ─────────────────────────────────────────────────────────────
 //
@@ -544,8 +544,8 @@ export function ReferenceTuner() {
           alignItems:      "flex-start",
           justifyContent:  "center",
           minHeight:       0,
-          padding:         "8px 12px 0",
-          gap:             16,
+          padding:         "6px 8px 0",
+          gap:             10,
         }}
       >
         {/* Left column — C (top) and G (bottom) */}

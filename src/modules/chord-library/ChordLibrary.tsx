@@ -210,7 +210,7 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
           </button>
         </div>
 
-        {/* Diagram */}
+        {/* Diagram — fills the available height, diagram as large as possible */}
         <div
           style={{
             flex:            1,
@@ -218,14 +218,14 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
             flexDirection:   "column",
             alignItems:      "center",
             justifyContent:  "center",
-            gap:             24,
-            padding:         "32px 24px",
+            gap:             16,
+            padding:         "16px 24px calc(var(--safe-bottom) + 16px)",
           }}
         >
-          <ChordDiagram chord={selected} size="lg" />
+          <ChordDiagram chord={selected} size="xl" />
           <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 4 }}>
             <p style={{ fontSize: 15, color: "var(--text-tertiary)" }}>G · C · E · A tuning</p>
-            <p style={{ fontSize: 14, color: "var(--text-tertiary)" }}>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
               Frets: {selected.frets.join("-")}
               {selected.baseFret && selected.baseFret > 1 ? ` (base fret ${selected.baseFret})` : ""}
             </p>
