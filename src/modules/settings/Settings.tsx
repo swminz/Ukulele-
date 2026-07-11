@@ -4,7 +4,7 @@ import { useSettings } from "@/hooks/use-settings"
 import { useTheme } from "@/components/theme-provider"
 import type { AppSettings } from "@/types"
 import {
-  Sun, Moon, Monitor, Bell, Smartphone, Type,
+  Sun, Moon, Bell, Smartphone, Type,
   Timer, Download, Upload, Info, ChevronRight,
 } from "lucide-react"
 
@@ -176,21 +176,19 @@ export function Settings() {
                 : <Sun  size={16} style={ICON_STYLE} />}
             </Badge>
           }
-          label="Theme"
+          label="Appearance"
         >
           <div className="ios-segmented" style={{ width: "auto" }}>
-            {(["light", "system", "dark"] as const).map((t) => (
+            {(["light", "dark"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTheme(t)}
                 className={`ios-segmented-item ${theme === t ? "active" : ""}`}
-                style={{ padding: "4px 10px", fontSize: 12 }}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", fontSize: 13 }}
               >
                 {t === "light"
-                  ? <Sun     size={13} />
-                  : t === "dark"
-                    ? <Moon  size={13} />
-                    : <Monitor size={13} />}
+                  ? <><Sun  size={13} /><span>Light</span></>
+                  : <><Moon size={13} /><span>Dark</span></>}
               </button>
             ))}
           </div>
