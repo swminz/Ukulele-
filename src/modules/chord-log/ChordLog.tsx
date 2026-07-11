@@ -194,7 +194,7 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
     await load()
     setIsCreating(false)
     setEditSong(null)
-    if (isCreating) setViewSong(song)
+    // Always return to the songs list after saving — no auto-open modal
   }
 
   const handleCancel = () => {

@@ -566,6 +566,8 @@ input[type="range"]::-moz-range-thumb {
   position:     relative;
   cursor:       pointer;
   border:       none;
+  outline:      none;                    /* remove browser focus ring */
+  -webkit-tap-highlight-color: transparent;
   transition:   background 0.25s ease;
   flex-shrink:  0;
 }
@@ -574,18 +576,22 @@ input[type="range"]::-moz-range-thumb {
   content:      "";
   position:     absolute;
   top:          2px;
+  left:         0;                       /* ensure consistent start */
   width:        27px;
   height:       27px;
   border-radius:50%;
   background:   #FFFFFF;
-  box-shadow:   0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow:   0 2px 6px rgba(0, 0, 0, 0.30);
   transition:   transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.ios-toggle[aria-checked="false"] { background: rgba(120, 120, 128, 0.16); }
+/* OFF — more visible gray so the off state reads clearly */
+.ios-toggle[aria-checked="false"]        { background: rgba(120,120,128,0.28); }
 .ios-toggle[aria-checked="false"]::after { transform: translateX(2px); }
-.ios-toggle[aria-checked="true"]  { background: var(--success); }
-.ios-toggle[aria-checked="true"]::after  { transform: translateX(20px); }
+
+/* ON — green, knob flush to right edge (51 − 27 − 2 = 22px) */
+.ios-toggle[aria-checked="true"]         { background: #34C759; }
+.ios-toggle[aria-checked="true"]::after  { transform: translateX(22px); }
 
 /* ══════════════════════════════════════════════════════════════════════
    ACCESSIBILITY

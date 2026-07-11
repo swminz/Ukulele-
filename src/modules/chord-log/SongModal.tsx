@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import type { Song, SongPDF } from "@/types"
 import { saveSong, deleteSong } from "@/lib/db"
-import { Edit3, Trash2, Copy, Heart, Share2, Play, Pause, FileText, Music2, ChevronRight } from "lucide-react"
+import { Edit3, Trash2, Copy, Heart, Share2, Play, Pause, FileText, Music2, ChevronRight, ChevronLeft } from "lucide-react"
 import { haptic } from "@/lib/audio"
 import { useSettings } from "@/hooks/use-settings"
 import { PDFViewer } from "@/modules/pdf-songbook/PDFViewer"
@@ -29,16 +29,27 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onDup
   const scrollRaf   = useRef<number | null>(null)
   const { settings } = useSettings()
 
-  const hasChords = Boolean(song.content?.trim())
-  const hasPDF    = Boolean(song.pdf)
+  const hasChords   = Boolean(song.content?.trim())
+  const hasPDF      = Boolean(song.pdf)
+  // PDF-only: song has no typed chords, only a PDF attachment
+  const pdfOnly     = hasPDF && !hasChords
 
-  useEffect(() => { if (!hasChords && hasPDF) setSegment("sheet") }, [hasChords, hasPDF])
+  useEffect(() => {
+    if (pdfOnly) setSegment("sheet")
+    else if (!hasChords && hasPDF) setSegment("sheet")
+  }, [hasChords, hasPDF, pdfOnly])
 
-  const segments: { id: Segment; label: string }[] = [
-    { id: "chords", label: "Chords" },
-    ...(hasPDF ? [{ id: "sheet" as Segment, label: "Sheet" }] : []),
-    { id: "info",   label: "Info" },
-  ]
+  // When it's a PDF-only song, skip the Chords tab entirely
+  const segments: { id: Segment; label: string }[] = pdfOnly
+    ? [
+        { id: "sheet", label: "Sheet" },
+        { id: "info",  label: "Info"  },
+      ]
+    : [
+        { id: "chords", label: "Chords" },
+        ...(hasPDF ? [{ id: "sheet" as Segment, label: "Sheet" }] : []),
+        { id: "info",   label: "Info" },
+      ]
 
   const startScroll = useCallback(() => {
     if (scrollRaf.current) return
@@ -117,18 +128,21 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onDup
       >
         <button
           onClick={onClose}
-          aria-label="Close"
+          aria-label="Back"
           style={{
-            background: "none",
-            border: "none",
-            fontSize: 17,
-            color: "var(--primary)",
-            cursor: "pointer",
-            padding: "8px 4px",
-            letterSpacing: "-0.41px",
+            background:  "none",
+            border:      "none",
+            color:       "var(--primary)",
+            cursor:      "pointer",
+            padding:     "0 8px",
+            height:      44,
+            display:     "flex",
+            alignItems:  "center",
+            gap:         2,
+            WebkitTapHighlightColor: "transparent",
           }}
         >
-          Done
+          <ChevronLeft size={22} strokeWidth={2} />
         </button>
 
         <div style={{ flex: 1, textAlign: "center", minWidth: 0, padding: "0 4px" }}>
