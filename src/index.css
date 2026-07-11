@@ -1,0 +1,575 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Tailwind theme bridge ─────────────────────────────────────────── */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background:          var(--background);
+  --color-foreground:          var(--foreground);
+  --color-card:                var(--card);
+  --color-card-foreground:     var(--card-foreground);
+  --color-popover:             var(--popover);
+  --color-popover-foreground:  var(--popover-foreground);
+  --color-primary:             var(--primary);
+  --color-primary-foreground:  var(--primary-foreground);
+  --color-secondary:           var(--secondary);
+  --color-secondary-foreground:var(--secondary-foreground);
+  --color-muted:               var(--muted);
+  --color-muted-foreground:    var(--muted-foreground);
+  --color-accent:              var(--accent);
+  --color-accent-foreground:   var(--accent-foreground);
+  --color-destructive:         var(--destructive);
+  --color-border:              var(--border);
+  --color-input:               var(--input);
+  --color-ring:                var(--ring);
+  --color-success:             var(--success);
+  --color-separator:           var(--separator);
+  --color-text-secondary:      var(--text-secondary);
+  --color-text-tertiary:       var(--text-tertiary);
+  --color-surface-secondary:   var(--surface-secondary);
+  --color-surface-elevated:    var(--surface-elevated);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS — Light (Apple-aligned)
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --radius: 0.75rem;
+
+  /* Backgrounds */
+  --background:        #F2F2F7;
+  --card:              #FFFFFF;
+  --popover:           #FFFFFF;
+  --surface-elevated:  #FFFFFF;
+  --surface-secondary: #F2F2F7;
+
+  /* Text */
+  --foreground:        #111827;
+  --card-foreground:   #111827;
+  --popover-foreground:#111827;
+  --text-secondary:    #3C3C43;
+  --text-tertiary:     #6B7280;
+  --muted-foreground:  #6B7280;
+
+  /* Accent — Apple Blue */
+  --primary:           #007AFF;
+  --primary-foreground:#FFFFFF;
+  --accent:            rgba(0, 122, 255, 0.08);
+  --accent-foreground: #007AFF;
+  --ring:              #007AFF;
+
+  /* Supporting */
+  --secondary:         #F2F2F7;
+  --secondary-foreground: #111827;
+  --muted:             #E9E9EE;
+  --success:           #34C759;
+  --destructive:       #FF3B30;
+  --destructive-foreground: #FFFFFF;
+  --warning:           #FF9F0A;
+
+  /* Structure */
+  --border:            #E5E7EB;
+  --input:             #FFFFFF;
+  --separator:         rgba(60, 60, 67, 0.13);
+  --separator-opaque:  #E5E7EB;
+
+  /* Charts */
+  --chart-1: #34C759;
+  --chart-2: #30D158;
+  --chart-3: #007AFF;
+  --chart-4: #FF9F0A;
+  --chart-5: #FF3B30;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS — Dark
+   ══════════════════════════════════════════════════════════════════════ */
+.dark {
+  --background:        #000000;
+  --card:              #1C1C1E;
+  --popover:           #1C1C1E;
+  --surface-elevated:  #1C1C1E;
+  --surface-secondary: #2C2C2E;
+
+  --foreground:        #FFFFFF;
+  --card-foreground:   #FFFFFF;
+  --popover-foreground:#FFFFFF;
+  --text-secondary:    #EBEBF5;
+  --text-tertiary:     #98989D;
+  --muted-foreground:  #98989D;
+
+  --primary:           #0A84FF;
+  --primary-foreground:#FFFFFF;
+  --accent:            rgba(10, 132, 255, 0.18);
+  --accent-foreground: #0A84FF;
+  --ring:              #0A84FF;
+
+  --secondary:         #1C1C1E;
+  --secondary-foreground: #FFFFFF;
+  --muted:             #3A3A3C;
+  --success:           #30D158;
+  --destructive:       #FF453A;
+  --destructive-foreground: #FFFFFF;
+  --warning:           #FF9F0A;
+
+  --border:            rgba(255, 255, 255, 0.12);
+  --input:             #2C2C2E;
+  --separator:         rgba(84, 84, 88, 0.65);
+  --separator-opaque:  #38383A;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   BASE
+   ══════════════════════════════════════════════════════════════════════ */
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+
+  body {
+    background:  var(--background);
+    color:       var(--foreground);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                 "Helvetica Neue", Arial, sans-serif;
+    font-size:   17px;
+    line-height: 1.47059;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
+  }
+
+  :focus-visible {
+    outline:        2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius:  4px;
+  }
+
+  ::-webkit-scrollbar { width: 0; background: transparent; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   APP SHELL
+   ══════════════════════════════════════════════════════════════════════ */
+.app-shell {
+  max-width:  430px;
+  margin:     0 auto;
+  min-height: 100dvh;
+  display:    flex;
+  flex-direction: column;
+}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+.ios-header {
+  background:             rgba(242, 242, 247, 0.92);
+  backdrop-filter:        saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:          1px solid var(--separator);
+}
+
+.dark .ios-header {
+  background: rgba(0, 0, 0, 0.88);
+}
+
+/* ── Bottom tab bar ──────────────────────────────────────────────── */
+.bottom-nav {
+  background:             rgba(242, 242, 247, 0.92);
+  backdrop-filter:        saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-top:             1px solid var(--separator);
+  padding-bottom:         env(safe-area-inset-bottom);
+}
+
+.dark .bottom-nav {
+  background: rgba(0, 0, 0, 0.88);
+}
+
+/* No highlight or ring on bottom-nav tab buttons */
+.bottom-nav button {
+  outline:                    none;
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   TYPOGRAPHY  (Apple HIG scale)
+   ══════════════════════════════════════════════════════════════════════ */
+.text-large-title { font-size: 34px; font-weight: 700; letter-spacing: 0.374px;  line-height: 41px; }
+.text-title1      { font-size: 28px; font-weight: 700; letter-spacing: 0.364px;  line-height: 34px; }
+.text-title2      { font-size: 22px; font-weight: 700; letter-spacing: 0.352px;  line-height: 28px; }
+.text-title3      { font-size: 20px; font-weight: 600; letter-spacing: 0.38px;   line-height: 25px; }
+.text-headline    { font-size: 17px; font-weight: 600; letter-spacing: -0.408px; line-height: 22px; }
+.text-body        { font-size: 17px; font-weight: 400; letter-spacing: -0.408px; line-height: 22px; }
+.text-callout     { font-size: 16px; font-weight: 400; letter-spacing: -0.32px;  line-height: 21px; }
+.text-subhead     { font-size: 15px; font-weight: 400; letter-spacing: -0.24px;  line-height: 20px; }
+.text-footnote    { font-size: 13px; font-weight: 400; letter-spacing: -0.078px; line-height: 18px; }
+.text-caption1    { font-size: 12px; font-weight: 400; letter-spacing: 0px;      line-height: 16px; }
+.text-caption2    { font-size: 11px; font-weight: 400; letter-spacing: 0.066px;  line-height: 13px; }
+
+/* iOS section header above grouped lists */
+.section-label {
+  font-size:      12px;
+  font-weight:    600;
+  letter-spacing: 0.5px;
+  color:          var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   GROUPED LIST  (iOS Settings style)
+   ══════════════════════════════════════════════════════════════════════ */
+.grouped-section {
+  background:    var(--card);
+  border-radius: 12px;
+  overflow:      hidden;
+}
+
+.grouped-row {
+  display:     flex;
+  align-items: center;
+  min-height:  48px;         /* 48pt touch target */
+  padding:     12px 16px;
+  background:  var(--card);
+  position:    relative;
+}
+
+/* hairline separator between rows */
+.grouped-row + .grouped-row::before {
+  content:  "";
+  position: absolute;
+  top:      0;
+  left:     16px;
+  right:    0;
+  height:   1px;
+  background: var(--separator);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   SURFACE CARDS
+   ══════════════════════════════════════════════════════════════════════ */
+.surface-card {
+  background:    var(--card);
+  border-radius: 12px;
+  overflow:      hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   FORM CONTROLS
+   ══════════════════════════════════════════════════════════════════════ */
+@layer components {
+
+  /* ── iOS native search bar ───────────────────────────────────────── */
+  .ios-search-wrap {
+    display:     flex;
+    align-items: center;
+    gap:         8px;
+  }
+
+  .ios-search-field {
+    flex:        1;
+    position:    relative;
+    display:     flex;
+    align-items: center;
+  }
+
+  .ios-search-icon {
+    position:       absolute;
+    left:           10px;
+    top:            50%;
+    transform:      translateY(-50%);
+    color:          var(--text-tertiary);
+    pointer-events: none;
+    display:        flex;
+  }
+
+  .ios-input {
+    width:         100%;
+    height:        36px;
+    border-radius: 10px;
+    background:    rgba(120, 120, 128, 0.12);
+    color:         var(--foreground);
+    padding:       0 10px 0 34px;
+    font-size:     17px;
+    font-family:   inherit;
+    border:        none;
+    outline:       none;
+    transition:    background 0.15s ease;
+  }
+
+  .ios-input::placeholder { color: var(--text-tertiary); }
+
+  .ios-input:focus {
+    background:  rgba(120, 120, 128, 0.16);
+    outline:     none;
+  }
+
+  .ios-clear-btn {
+    position:        absolute;
+    right:           8px;
+    top:             50%;
+    transform:       translateY(-50%);
+    background:      rgba(120, 120, 128, 0.4);
+    border:          none;
+    border-radius:   50%;
+    width:           18px;
+    height:          18px;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    cursor:          pointer;
+    color:           #fff;
+    padding:         0;
+  }
+
+  .ios-cancel-btn {
+    background:     none;
+    border:         none;
+    cursor:         pointer;
+    font-family:    inherit;
+    font-size:      17px;
+    font-weight:    400;
+    color:          var(--primary);
+    padding:        0 4px;
+    flex-shrink:    0;
+    letter-spacing: -0.41px;
+    white-space:    nowrap;
+  }
+
+  /* ── Buttons ──────────────────────────────────────────────────────── */
+  .btn {
+    display:         inline-flex;
+    align-items:     center;
+    justify-content: center;
+    gap:             6px;
+    font-family:     inherit;
+    font-size:       17px;
+    font-weight:     600;
+    border-radius:   12px;
+    height:          50px;
+    padding:         0 20px;
+    cursor:          pointer;
+    border:          none;
+    transition:      opacity 0.12s ease, transform 0.12s ease;
+    user-select:     none;
+  }
+
+  .btn:active { transform: scale(0.97); opacity: 0.85; }
+
+  .btn-filled      { background: var(--primary); color: #FFFFFF; }
+  .btn-tinted      { background: rgba(0, 122, 255, 0.1); color: var(--primary); }
+  .btn-ghost       { background: transparent; color: var(--primary); }
+  .btn-destructive { background: rgba(255, 59, 48, 0.1); color: var(--destructive); }
+
+  /* Small circular icon button */
+  .icon-btn {
+    display:         inline-flex;
+    align-items:     center;
+    justify-content: center;
+    width:           34px;
+    height:          34px;
+    border-radius:   50%;
+    background:      rgba(120, 120, 128, 0.12);
+    border:          none;
+    cursor:          pointer;
+    color:           var(--primary);
+    transition:      background 0.12s ease, transform 0.1s ease;
+  }
+
+  .icon-btn:active { transform: scale(0.92); }
+
+  /* Compatibility aliases */
+  .ios-button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-family: inherit; font-size: 17px; font-weight: 600; border-radius: 12px;
+    height: 50px; padding: 0 20px; cursor: pointer; border: none;
+    transition: opacity 0.12s ease, transform 0.12s ease; user-select: none;
+  }
+  .ios-button:active { transform: scale(0.97); opacity: 0.85; }
+  .ios-button-primary   { background: var(--primary); color: #FFFFFF; }
+  .ios-button-secondary { background: rgba(120,120,128,0.12); color: var(--foreground); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   SEGMENTED CONTROL  (native iOS pill)
+   ══════════════════════════════════════════════════════════════════════ */
+.ios-segmented {
+  background:    rgba(120, 120, 128, 0.12);
+  border-radius: 9px;
+  padding:       2px;
+  display:       flex;
+  width:         100%;
+}
+
+.ios-segmented-item {
+  flex:           1;
+  padding:        6px 12px;
+  border-radius:  7px;
+  font-size:      13px;
+  font-weight:    500;
+  letter-spacing: -0.08px;
+  color:          var(--text-tertiary);
+  text-align:     center;
+  background:     transparent;
+  border:         none;
+  cursor:         pointer;
+  transition:     all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  white-space:    nowrap;
+  user-select:    none;
+}
+
+.ios-segmented-item.active {
+  background:  var(--card);
+  color:       var(--foreground);
+  font-weight: 600;
+  box-shadow:  0 2px 8px rgba(0, 0, 0, 0.1), 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MODALS / SHEETS
+   ══════════════════════════════════════════════════════════════════════ */
+.modal-slide-up {
+  animation: slideUp 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0);    }
+}
+
+.sheet-slide-up {
+  animation: sheetUp 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(60px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   CHORD EDITOR  (monospace text area)
+   ══════════════════════════════════════════════════════════════════════ */
+.chord-editor {
+  font-family: "SF Mono", "Menlo", "Monaco", "Fira Code", monospace;
+  font-size:   14px;
+  line-height: 1.7;
+  white-space: pre;
+  overflow-x:  auto;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   TUNER / INSTRUMENT  animations
+   ══════════════════════════════════════════════════════════════════════ */
+.meter-indicator {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background-color 0.25s ease;
+}
+
+.in-tune-pulse {
+  animation: inTunePulse 1.8s ease-in-out infinite;
+}
+
+@keyframes inTunePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   BEAT FLASH  (metronome)
+   ══════════════════════════════════════════════════════════════════════ */
+.beat-flash { animation: beatFlash 0.1s ease-out; }
+
+@keyframes beatFlash {
+  0%   { background: var(--primary); }
+  100% { background: transparent;   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PDF VIEWER
+   ══════════════════════════════════════════════════════════════════════ */
+.pdf-page-container { touch-action: pinch-zoom pan-y; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   SCROLL UTILITIES
+   ══════════════════════════════════════════════════════════════════════ */
+.scroll-content {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   RANGE SLIDER
+   ══════════════════════════════════════════════════════════════════════ */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance:         none;
+  height:             4px;
+  border-radius:      2px;
+  outline:            none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width:       22px;
+  height:      22px;
+  border-radius: 50%;
+  background:  #FFFFFF;
+  box-shadow:  0 2px 6px rgba(0, 0, 0, 0.2);
+  cursor:      pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width:        22px;
+  height:       22px;
+  border:       none;
+  border-radius:50%;
+  background:   #FFFFFF;
+  box-shadow:   0 2px 6px rgba(0, 0, 0, 0.2);
+  cursor:       pointer;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   TOGGLE SWITCH
+   ══════════════════════════════════════════════════════════════════════ */
+.ios-toggle {
+  width:        51px;
+  height:       31px;
+  border-radius:100px;
+  position:     relative;
+  cursor:       pointer;
+  border:       none;
+  transition:   background 0.25s ease;
+  flex-shrink:  0;
+}
+
+.ios-toggle::after {
+  content:      "";
+  position:     absolute;
+  top:          2px;
+  width:        27px;
+  height:       27px;
+  border-radius:50%;
+  background:   #FFFFFF;
+  box-shadow:   0 2px 6px rgba(0, 0, 0, 0.25);
+  transition:   transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.ios-toggle[aria-checked="false"] { background: rgba(120, 120, 128, 0.16); }
+.ios-toggle[aria-checked="false"]::after { transform: translateX(2px); }
+.ios-toggle[aria-checked="true"]  { background: var(--success); }
+.ios-toggle[aria-checked="true"]::after  { transform: translateX(20px); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY
+   ══════════════════════════════════════════════════════════════════════ */
+.touch-target { min-width: 48px; min-height: 48px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration:    0.01ms !important;
+    transition-duration:   0.01ms !important;
+    scroll-behavior:       auto !important;
+  }
+}
