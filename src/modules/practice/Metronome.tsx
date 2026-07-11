@@ -373,34 +373,59 @@ export function Metronome() {
         <p className="section-label" style={{ paddingLeft: 2, marginBottom: 10 }}>Time Signature</p>
         <button
           onClick={handleTimeSig}
+          aria-label={`Time signature ${timeSig}/4 — tap to cycle`}
           style={{
-            width:           "100%",
-            display:         "flex",
-            alignItems:      "center",
-            justifyContent:  "space-between",
-            background:      "var(--card)",
-            border:          "none",
-            borderRadius:    12,
-            padding:         "10px 16px",
-            cursor:          "pointer",
-            boxShadow:       "0 1px 4px rgba(0,0,0,0.04), 0 0 0 1px rgba(60,60,67,0.08)",
+            width:        "100%",
+            position:     "relative",
+            display:      "flex",
+            alignItems:   "center",
+            justifyContent: "center",
+            background:   "var(--card)",
+            border:       "none",
+            borderRadius: 14,
+            padding:      "14px 16px",
+            cursor:       "pointer",
+            boxShadow:    "0 1px 4px rgba(0,0,0,0.04), 0 0 0 1px rgba(60,60,67,0.08)",
+            minHeight:    76,
           }}
         >
+          {/* Fraction — always horizontally centred */}
           <span
             style={{
-              fontSize:      40,
-              fontWeight:    700,
-              letterSpacing: "-1px",
-              color:         "var(--foreground)",
-              lineHeight:    1,
+              display:            "flex",
+              alignItems:         "center",
+              gap:                8,
+              fontSize:           56,
+              fontWeight:         700,
+              letterSpacing:      "-2px",
+              lineHeight:         1,
               fontVariantNumeric: "tabular-nums",
+              color:              "var(--foreground)",
             }}
           >
-            {timeSig}
-            <span style={{ color: "var(--text-tertiary)", fontWeight: 300, margin: "0 4px" }}>/</span>
-            4
+            <span>{timeSig}</span>
+            <span
+              style={{
+                fontSize:   44,
+                fontWeight: 300,
+                color:      "var(--text-tertiary)",
+                letterSpacing: 0,
+              }}
+            >/</span>
+            <span>4</span>
           </span>
-          <ChevronRight size={18} strokeWidth={1.8} style={{ color: "var(--text-tertiary)", opacity: 0.5 }} />
+
+          {/* Chevron anchored to the right edge */}
+          <ChevronRight
+            size={18}
+            strokeWidth={2}
+            style={{
+              position: "absolute",
+              right:    16,
+              color:    "var(--text-tertiary)",
+              opacity:  0.45,
+            }}
+          />
         </button>
       </div>
 

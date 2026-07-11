@@ -14,16 +14,14 @@ function newSong(): Song {
   return { id: makeId(), title: "", artist: "", content: "", createdAt: now, modifiedAt: now, favorite: false }
 }
 
-// ── iOS-style search bar with Cancel button ─────────────────────────
+// ── iOS-style search bar ─────────────────────────────────────────────────────
 function SearchBar({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [focused, setFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   return (
     <div className="ios-search-wrap">
       <div className="ios-search-field">
-        <span className="ios-search-icon">
-          <Search size={15} />
-        </span>
+        <span className="ios-search-icon"><Search size={15} /></span>
         <input
           ref={inputRef}
           value={value}
@@ -59,27 +57,35 @@ function SearchBar({ value, onChange }: { value: string; onChange: (v: string) =
 }
 
 interface Props {
+  // Incrementing token: when it changes, open the new-song editor.
+  // ChordLog ONLY opens the editor in response to this trigger, never
+  // automatically on mount, so the songs list always shows first.
   addTrigger?: number
 }
 
 export function ChordLog({ addTrigger }: Props) {
-  const [songs,      setSongs]      = useState<Song[]>([])
-  const [query,      setQuery]      = useState("")
-  const [viewSong,   setViewSong]   = useState<Song | null>(null)
-  const [editSong,   setEditSong]   = useState<Song | null>(null)
+  const [songs,      setSongs]    = useState<Song[]>([])
+  const [query,      setQuery]    = useState("")
+  const [viewSong,   setViewSong] = useState<Song | null>(null)
+  const [editSong,   setEditSong] = useState<Song | null>(null)
   const [isCreating, setIsCreating] = useState(false)
 
   const load = async () => setSongs(await getAllSongs())
   useEffect(() => { void load() }, [])
 
-  // Open new-song editor whenever the parent increments addTrigger
-  const prevTrigger = useRef(0)
+  // Track the trigger value we last acted on.
+  // Initialise to the *current* addTrigger value (not 0) so that when
+  // ChordLog mounts (or remounts after a tab switch), a stale trigger
+  // value in the parent does NOT automatically open the editor.
+  const prevTrigger = useRef(addTrigger ?? 0)
   useEffect(() => {
-    if (!addTrigger || addTrigger === prevTrigger.current) return
+    if (addTrigger === undefined) return
+    if (addTrigger === prevTrigger.current) return   // same value → ignore
     prevTrigger.current = addTrigger
     handleCreate()
   }, [addTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Derived lists ──────────────────────────────────────────────────────────
   const filtered = songs.filter((s) => {
     const q = query.toLowerCase()
     return (
@@ -88,22 +94,32 @@ export function ChordLog({ addTrigger }: Props) {
       (s.album ?? "").toLowerCase().includes(q)
     )
   })
-
-  const favorites    = filtered.filter((s) => s.favorite)
+  const favorites    = filtered.filter((s) =>  s.favorite)
   const nonFavorites = filtered.filter((s) => !s.favorite)
 
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleCreate = () => {
     haptic(10)
-    const s = newSong()
-    setEditSong(s)
+    setEditSong(newSong())
     setIsCreating(true)
   }
 
   const handleSave = async (song: Song) => {
+    // Only write to DB when the user explicitly taps Add / Done
     await saveSong(song)
     await load()
-    if (isCreating) { setIsCreating(false); setEditSong(null); setViewSong(song) }
-    else { setEditSong(null); setViewSong(song) }
+    setIsCreating(false)
+    setEditSong(null)
+    if (isCreating) {
+      // Open the view modal immediately after creating
+      setViewSong(song)
+    }
+  }
+
+  const handleCancel = () => {
+    // Discard the draft — nothing was written to DB (auto-save removed)
+    setEditSong(null)
+    setIsCreating(false)
   }
 
   const handleDeleted = async () => { await load(); setViewSong(null) }
@@ -121,12 +137,14 @@ export function ChordLog({ addTrigger }: Props) {
     setViewSong(null)
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
   if (editSong) {
     return (
       <SongEditor
         song={editSong}
+        isNew={isCreating}
         onSave={handleSave}
-        onCancel={() => { setEditSong(null); setIsCreating(false) }}
+        onCancel={handleCancel}
       />
     )
   }
@@ -135,14 +153,14 @@ export function ChordLog({ addTrigger }: Props) {
     <>
       <div
         style={{
-          flex:           1,
-          display:        "flex",
-          flexDirection:  "column",
-          overflow:       "hidden",
-          background:     "var(--background)",
+          flex:          1,
+          display:       "flex",
+          flexDirection: "column",
+          overflow:      "hidden",
+          background:    "var(--background)",
         }}
       >
-        {/* ── Search bar ── */}
+        {/* ── Search ── */}
         <div style={{ padding: "10px 16px 12px", flexShrink: 0 }}>
           <SearchBar value={query} onChange={setQuery} />
         </div>
@@ -179,7 +197,6 @@ export function ChordLog({ addTrigger }: Props) {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-
               {favorites.length > 0 && (
                 <div>
                   <p className="section-label" style={{ paddingLeft: 16, marginBottom: 8 }}>
@@ -217,7 +234,6 @@ export function ChordLog({ addTrigger }: Props) {
                   </div>
                 </div>
               )}
-
             </div>
           )}
         </div>
@@ -227,7 +243,7 @@ export function ChordLog({ addTrigger }: Props) {
         <SongModal
           song={viewSong}
           onClose={() => setViewSong(null)}
-          onEdit={(s) => { setEditSong(s); setViewSong(null) }}
+          onEdit={(s) => { setEditSong(s); setIsCreating(false); setViewSong(null) }}
           onDeleted={handleDeleted}
           onDuplicate={handleDuplicate}
           onToggleFavorite={handleToggleFavorite}
