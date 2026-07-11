@@ -150,7 +150,7 @@ function TempoWheel({ bpm, running, beat, onBpmChange, onToggle }: WheelProps) {
         stroke="var(--separator)" strokeWidth={1}
       />
 
-      {/* Play / Stop icon in center */}
+      {/* Play / Stop icon + label in center */}
       <g
         onClick={onToggle}
         style={{ cursor: "pointer" }}
@@ -159,16 +159,29 @@ function TempoWheel({ bpm, running, beat, onBpmChange, onToggle }: WheelProps) {
         {running ? (
           /* Stop square */
           <rect
-            x={CX - 12} y={CY - 12} width={24} height={24} rx={4}
+            x={CX - 12} y={CY - 18} width={24} height={24} rx={4}
             fill="var(--primary)"
           />
         ) : (
-          /* Play triangle */
+          /* Play triangle — shifted up slightly to make room for label */
           <path
-            d={`M ${CX - 9},${CY - 13} L ${CX + 15},${CY} L ${CX - 9},${CY + 13} Z`}
+            d={`M ${CX - 9},${CY - 19} L ${CX + 15},${CY - 6} L ${CX - 9},${CY + 7} Z`}
             fill="var(--primary)"
           />
         )}
+        {/* Subtle "Play" / "Stop" hint label */}
+        <text
+          x={CX}
+          y={CY + 22}
+          textAnchor="middle"
+          fontSize={11}
+          fontWeight={500}
+          letterSpacing={0.5}
+          fill="var(--text-tertiary)"
+          style={{ userSelect: "none", fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" }}
+        >
+          {running ? "Stop" : "Play"}
+        </text>
       </g>
 
       {/* Handle dot */}
@@ -379,7 +392,7 @@ export function Metronome() {
         <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 6 }}>
           Beat Accent
         </p>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "center" }}>
           {Array.from({ length: timeSig }, (_, i) => i + 1).map((n) => {
             const active = n === accentBeat
             const isBeat = beat === n
@@ -390,10 +403,11 @@ export function Metronome() {
                 aria-label={`Accent beat ${n}`}
                 aria-pressed={active}
                 style={{
-                  flex:         1,
+                  width:        16,
                   height:       16,
                   borderRadius: "50%",
                   border:       "none",
+                  flexShrink:   0,
                   background:   active
                     ? "var(--primary)"
                     : isBeat
@@ -401,7 +415,7 @@ export function Metronome() {
                       : "rgba(120,120,128,0.18)",
                   cursor:       "pointer",
                   transition:   "background 0.12s ease, transform 0.06s ease",
-                  transform:    isBeat ? "scale(1.25)" : "scale(1)",
+                  transform:    isBeat ? "scale(1.35)" : "scale(1)",
                   padding:      0,
                   WebkitTapHighlightColor: "transparent",
                 }}
