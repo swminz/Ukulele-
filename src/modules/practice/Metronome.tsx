@@ -265,136 +265,113 @@ export function Metronome() {
         display:       "flex",
         flexDirection: "column",
         height:        "100%",
+        overflow:      "hidden",          /* never scroll — everything fits */
         background:    "var(--background)",
-        overflowY:     "auto",
       }}
     >
-      {/* ── Tempo: label + BPM hero + slider ─────────────────────────── */}
-      <div style={{ padding: "12px 20px 0", flexShrink: 0 }}>
-        <p className="section-label" style={{ paddingLeft: 2, marginBottom: 8 }}>Tempo</p>
+      {/* ── BPM hero + slider ────────────────────────────────────────── */}
+      <div style={{ padding: "8px 20px 0", flexShrink: 0 }}>
 
         {/* BPM row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {/* − */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
             onClick={() => setBpm(bpm - 1)}
-            onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.9)" }}
-            onPointerUp={(e)   => { (e.currentTarget as HTMLElement).style.transform = "scale(1)" }}
+            onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.88)" }}
+            onPointerUp={(e)   => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"   }}
+            onPointerCancel={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)" }}
             aria-label="Decrease BPM"
             style={{
-              width: 42, height: 42, borderRadius: 12,
+              width: 38, height: 38, borderRadius: 10,
               background: "var(--card)", border: "none",
-              fontSize: 24, fontWeight: 300, color: "var(--foreground)",
+              fontSize: 22, fontWeight: 300, color: "var(--foreground)",
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(60,60,67,0.1)",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(60,60,67,0.10)",
               transition: "transform 0.08s ease", flexShrink: 0,
             }}
           >−</button>
 
-          {/* BPM + labels */}
           <div style={{ flex: 1, textAlign: "center" }}>
-            <p
-              style={{
-                fontSize:           64,
-                fontWeight:         700,
-                letterSpacing:      "-2px",
-                lineHeight:         1,
-                fontVariantNumeric: "tabular-nums",
-                color:              running ? "var(--primary)" : "var(--foreground)",
-                transition:         "color 0.25s ease",
-              }}
-            >
+            <p style={{
+              fontSize: 54, fontWeight: 700, letterSpacing: "-2px", lineHeight: 1,
+              fontVariantNumeric: "tabular-nums",
+              color: running ? "var(--primary)" : "var(--foreground)",
+              transition: "color 0.25s ease",
+            }}>
               {bpm}
             </p>
-            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase", color: "var(--text-tertiary)", marginTop: 2 }}>
+            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--text-tertiary)", marginTop: 1 }}>
               BPM · {label}
             </p>
           </div>
 
-          {/* + */}
           <button
             onClick={() => setBpm(bpm + 1)}
-            onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.9)" }}
-            onPointerUp={(e)   => { (e.currentTarget as HTMLElement).style.transform = "scale(1)" }}
+            onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.88)" }}
+            onPointerUp={(e)   => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"   }}
+            onPointerCancel={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)" }}
             aria-label="Increase BPM"
             style={{
-              width: 42, height: 42, borderRadius: 12,
+              width: 38, height: 38, borderRadius: 10,
               background: "var(--card)", border: "none",
-              fontSize: 24, fontWeight: 300, color: "var(--foreground)",
+              fontSize: 22, fontWeight: 300, color: "var(--foreground)",
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(60,60,67,0.1)",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(60,60,67,0.10)",
               transition: "transform 0.08s ease", flexShrink: 0,
             }}
           >+</button>
         </div>
 
         {/* Slider */}
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 8 }}>
           <input
-            type="range"
-            min={MIN_BPM}
-            max={MAX_BPM}
-            value={bpm}
+            type="range" min={MIN_BPM} max={MAX_BPM} value={bpm}
             onChange={(e) => setBpm(Number(e.target.value))}
             aria-label="Tempo"
             style={{
-              width:      "100%",
+              width: "100%",
               background: `linear-gradient(to right, var(--primary) ${pct}%, rgba(120,120,128,0.18) 0%)`,
             }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{MIN_BPM}</span>
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{MAX_BPM}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 1 }}>
+            <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{MIN_BPM}</span>
+            <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{MAX_BPM}</span>
           </div>
         </div>
       </div>
 
-      {/* ── Time Signature ────────────────────────────────────────────── */}
-      <div style={{ padding: "12px 20px 0", flexShrink: 0 }}>
-        <p className="section-label" style={{ paddingLeft: 2, marginBottom: 6 }}>Time Signature</p>
+      {/* ── Time Sig + Beat Accent — single compact row ───────────────── */}
+      <div style={{ padding: "8px 20px 0", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+
+        {/* Time sig pill — tap to cycle */}
         <button
           onClick={handleTimeSig}
           aria-label={`Time signature ${timeSig}/4 — tap to cycle`}
           style={{
-            width:        "100%",
-            position:     "relative",
             display:      "flex",
             alignItems:   "center",
-            justifyContent: "center",
+            gap:          3,
             background:   "var(--card)",
             border:       "none",
-            borderRadius: 14,
-            padding:      "10px 16px",
+            borderRadius: 10,
+            padding:      "6px 12px",
             cursor:       "pointer",
-            boxShadow:    "0 1px 4px rgba(0,0,0,0.04), 0 0 0 1px rgba(60,60,67,0.08)",
-            minHeight:    56,
+            boxShadow:    "0 0 0 1px rgba(60,60,67,0.10), 0 1px 3px rgba(0,0,0,0.05)",
+            flexShrink:   0,
+            WebkitTapHighlightColor: "transparent",
           }}
         >
-          <span
-            style={{
-              display:            "flex",
-              alignItems:         "center",
-              gap:                6,
-              fontSize:           42,
-              fontWeight:         700,
-              letterSpacing:      "-1.5px",
-              lineHeight:         1,
-              fontVariantNumeric: "tabular-nums",
-              color:              "var(--foreground)",
-            }}
-          >
-            <span>{timeSig}</span>
-            <span style={{ fontSize: 34, fontWeight: 300, color: "var(--text-tertiary)", letterSpacing: 0 }}>/</span>
-            <span>4</span>
+          <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", fontVariantNumeric: "tabular-nums", color: "var(--foreground)" }}>
+            {timeSig}
           </span>
-          <ChevronRight size={16} strokeWidth={2} style={{ position: "absolute", right: 14, color: "var(--text-tertiary)", opacity: 0.45 }} />
+          <span style={{ fontSize: 18, fontWeight: 300, color: "var(--text-tertiary)" }}>/</span>
+          <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", fontVariantNumeric: "tabular-nums", color: "var(--foreground)" }}>
+            4
+          </span>
+          <ChevronRight size={12} strokeWidth={2} style={{ color: "var(--text-tertiary)", opacity: 0.5, marginLeft: 2 }} />
         </button>
-      </div>
 
-      {/* ── Beat Accent ───────────────────────────────────────────────── */}
-      <div style={{ padding: "12px 20px 0", flexShrink: 0 }}>
-        <p className="section-label" style={{ paddingLeft: 2, marginBottom: 6 }}>Beat Accent</p>
-        <div style={{ display: "flex", gap: 8 }}>
+        {/* Beat accent dots */}
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {Array.from({ length: timeSig }, (_, i) => i + 1).map((n) => {
             const active = n === accentBeat
             const isBeat = beat === n
@@ -405,18 +382,24 @@ export function Metronome() {
                 aria-label={`Accent beat ${n}`}
                 aria-pressed={active}
                 style={{
-                  flex:         1,
-                  height:       44,
-                  borderRadius: 10,
+                  width:        34,
+                  height:       34,
+                  borderRadius: "50%",
                   border:       active ? "none" : "1.5px solid rgba(60,60,67,0.15)",
-                  background:   active ? "var(--primary)" : isBeat ? "rgba(0,122,255,0.08)" : "var(--card)",
-                  color:        active ? "#FFFFFF" : "var(--foreground)",
-                  fontSize:     18,
+                  background:   active
+                    ? "var(--primary)"
+                    : isBeat
+                      ? "rgba(0,122,255,0.08)"
+                      : "var(--card)",
+                  color:        active ? "#FFF" : "var(--foreground)",
+                  fontSize:     15,
                   fontWeight:   600,
                   cursor:       "pointer",
-                  transition:   "background 0.15s ease, transform 0.06s ease",
-                  transform:    isBeat ? "scale(1.08)" : "scale(1)",
-                  boxShadow:    active ? "0 2px 8px rgba(0,122,255,0.25)" : "0 1px 3px rgba(0,0,0,0.04)",
+                  transition:   "background 0.12s ease, transform 0.06s ease",
+                  transform:    isBeat ? "scale(1.14)" : "scale(1)",
+                  boxShadow:    active ? "0 2px 6px rgba(0,122,255,0.28)" : "0 1px 3px rgba(0,0,0,0.05)",
+                  flexShrink:   0,
+                  WebkitTapHighlightColor: "transparent",
                 }}
               >
                 {n}
@@ -426,18 +409,16 @@ export function Metronome() {
         </div>
       </div>
 
-      {/* ── Circular tempo wheel ──────────────────────────────────────── */}
-      <div
-        style={{
-          flex:            1,
-          display:         "flex",
-          alignItems:      "center",
-          justifyContent:  "center",
-          padding:         "10px 24px 0",
-          minHeight:       0,
-        }}
-      >
-        <div style={{ width: "100%", maxWidth: 300 }}>
+      {/* ── Circular tempo wheel — fills all remaining space ─────────── */}
+      <div style={{
+        flex:           1,
+        display:        "flex",
+        alignItems:     "center",
+        justifyContent: "center",
+        padding:        "6px 16px 0",
+        minHeight:      0,
+      }}>
+        <div style={{ width: "100%", maxWidth: 380 }}>
           <TempoWheel
             bpm={bpm}
             running={running}
@@ -448,8 +429,7 @@ export function Metronome() {
         </div>
       </div>
 
-      {/* Safe-area spacer at the bottom */}
-      <div style={{ height: "calc(var(--safe-bottom) + 8px)", flexShrink: 0 }} />
+      <div style={{ height: "calc(var(--safe-bottom) + 6px)", flexShrink: 0 }} />
     </div>
   )
 }
