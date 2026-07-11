@@ -94,6 +94,40 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onTog
     setSong((s) => ({ ...s, pdf: s.pdf ? { ...s.pdf, ...patch } : s.pdf }))
   }
 
+  const renderChordAwareLine = (line: string, i: number) => {
+    const parts = line.split(/(\[[^\]]+\])/g)
+    return (
+      <p
+        key={`line-${i}`}
+        style={{
+          margin: 0,
+          fontSize: 16,
+          lineHeight: 1.6,
+          fontWeight: 400,
+          color: "var(--foreground)",
+          whiteSpace: "pre-wrap",
+          overflowWrap: "anywhere",
+          wordBreak: "break-word",
+        }}
+      >
+        {parts.map((part, idx) => {
+          const isChord = /^\[[^\]]+\]$/.test(part)
+          return (
+            <span
+              key={`seg-${i}-${idx}`}
+              style={{
+                fontWeight: isChord ? 700 : 400,
+                color: isChord ? "var(--foreground)" : "var(--foreground)",
+              }}
+            >
+              {part}
+            </span>
+          )
+        })}
+      </p>
+    )
+  }
+
   return (
     <div
       className="modal-slide-up"
@@ -264,27 +298,78 @@ export function SongModal({ song: initialSong, onClose, onEdit, onDeleted, onTog
 
       {/* ══ Sheet Music ══ */}
       {segment === "sheet" && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+        <div
+          className="scroll-content"
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "18px 16px calc(var(--safe-bottom) + 22px)",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
           {hasPDF ? (
             <>
-              <div style={{ width: 60, height: 60, borderRadius: 14, background: "rgba(0,122,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
-                <FileText size={28} strokeWidth={1.2} style={{ color: "var(--primary)" }} />
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0, marginBottom: 6 }}>
+                  {song.pdf!.filename}
+                </p>
+                <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
+                  {(song.pdf!.size / 1_048_576).toFixed(1)} MB
+                  {song.pdf!.bookmarks.length > 0 ? ` · ${song.pdf!.bookmarks.length} bookmark${song.pdf!.bookmarks.length > 1 ? "s" : ""}` : ""}
+                  {` · Last page ${song.pdf!.lastViewedPage}`}
+                </p>
               </div>
-              <p style={{ fontSize: 17, fontWeight: 600, marginBottom: 4, textAlign: "center" }}>{song.pdf!.filename}</p>
-              <p style={{ fontSize: 15, color: "var(--text-tertiary)", marginBottom: 2 }}>
-                {(song.pdf!.size / 1_048_576).toFixed(1)} MB
-                {song.pdf!.bookmarks.length > 0 ? ` · ${song.pdf!.bookmarks.length} bookmark${song.pdf!.bookmarks.length > 1 ? "s" : ""}` : ""}
-              </p>
-              <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 28 }}>
-                Last on page {song.pdf!.lastViewedPage}
-              </p>
-              <button
-                onClick={() => setPdfOpen(true)}
-                className="btn btn-filled"
-                style={{ fontSize: 15, height: 44, paddingLeft: 28, paddingRight: 28 }}
+
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  background: "var(--card)",
+                  borderRadius: 14,
+                  padding: "16px 14px",
+                  boxShadow: "0 0 0 1px var(--separator)",
+                }}
               >
-                Open Sheet Music
-              </button>
+                {song.pdf!.parsedText?.trim() ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {song.pdf!.parsedText.split("\n").map((line, i) => renderChordAwareLine(line, i))}
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center", gap: 10 }}>
+                    <FileText size={34} strokeWidth={1.2} style={{ color: "var(--text-tertiary)" }} />
+                    <p style={{ fontSize: 16, fontWeight: 600, color: "var(--foreground)", margin: 0 }}>
+                      Could not parse text from this PDF
+                    </p>
+                    <p style={{ fontSize: 14, color: "var(--text-tertiary)", margin: 0, lineHeight: "20px", maxWidth: 280 }}>
+                      You can still open the original PDF layout below.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 14, display: "flex", justifyContent: "center" }}>
+                <button
+                  onClick={() => setPdfOpen(true)}
+                  style={{
+                    border: "none",
+                    borderRadius: 999,
+                    padding: "10px 16px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    letterSpacing: "-0.1px",
+                    color: "var(--foreground)",
+                    background: "rgba(255,255,255,0.08)",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(255,255,255,0.22)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
+                    cursor: "pointer",
+                  }}
+                >
+                  View Original PDF Layout
+                </button>
+              </div>
             </>
           ) : (
             <>

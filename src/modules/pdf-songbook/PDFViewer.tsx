@@ -5,10 +5,7 @@ import { updateSongPDFMeta } from "@/lib/db"
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { X, ZoomIn, ZoomOut, TriangleAlert, PanelLeft, Bookmark, Minimize2, Maximize2 } from "lucide-react"
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString()
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
 
 interface Props {
   pdf: SongPDF

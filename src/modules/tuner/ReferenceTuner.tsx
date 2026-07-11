@@ -4,7 +4,6 @@ import {
   startPitchDetection,
   stopPitchDetection,
   centsDifference,
-  frequencyToNote,
   type PitchDetectionResult,
 } from "@/lib/pitch"
 import { ChevronDown, Check, Mic } from "lucide-react"
@@ -187,7 +186,7 @@ function MinimalHeadstock({ selectedString, autoString, inTune, isListening }: H
            Stroke: fully opaque — clearly the neck outline, distinct from strings.
            Strings are drawn after this rect (on top) so they appear 100% solid
            regardless of the fill opacity, in both light and dark themes. */}
-      <rect x={46} y={177} width={108} height={163} rx={4}
+      <rect x={46} y={177} width={108} height={160} rx={4}
         fill="rgba(200,198,195,0.22)"
         stroke="rgba(118,116,114,0.92)"
         strokeWidth={2} />
@@ -265,11 +264,11 @@ function StringBtn({ name, isSelected, isAuto, inTune, isListening, onClick }: S
 // ── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: TuneStatus }) {
   const cfg = {
-    idle:      { text: "Tap a string or pluck your ukulele", color: "var(--text-tertiary)" },
-    listening: { text: "Listening…",                          color: "var(--text-tertiary)" },
-    flat:      { text: "Too Flat",                            color: "var(--destructive)"   },
-    sharp:     { text: "Too Sharp",                           color: "var(--warning)"       },
-    intune:    { text: "In Tune",                             color: "var(--success)"       },
+    idle:      { text: "Tap button and pluck your string", color: "var(--text-tertiary)" },
+    listening: { text: "Start playing",                     color: "var(--text-tertiary)" },
+    flat:      { text: "Tune higher",                       color: "var(--destructive)"   },
+    sharp:     { text: "Tune lower",                        color: "var(--warning)"       },
+    intune:    { text: "Tuned",                             color: "var(--success)"       },
   }[status]
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 22 }}>
@@ -341,45 +340,83 @@ function TuningPicker({ current, options, onChange }: {
 }
 
 // ── Horizontal tuning meter ───────────────────────────────────────────────────
-interface MeterProps { cents: number; isActive: boolean; inTune: boolean }
+interface MeterProps { detuneHz: number; isActive: boolean; inTune: boolean }
 
-function HorizontalMeter({ cents, isActive, inTune }: MeterProps) {
-  const W = 300, H = 52, cx = W / 2, trackY = 38, zoneTop = 8
-  const clamped = Math.max(-METER_RANGE, Math.min(METER_RANGE, cents))
-  const needleX = isActive ? cx + (clamped / METER_RANGE) * cx : cx
+function HorizontalMeter({ detuneHz, isActive, inTune }: MeterProps) {
+  const W = 300, H = 64, cx = W / 2
+  const arcLeft = 16
+  const arcRight = W - 16
+  const arcBaseY = 50
+  const arcPeakY = 14
+  const pivotY = 54
+  const sweepDeg = 60 // total sweep: -30° (flat) to +30° (sharp)
+  // Drive needle by absolute frequency delta so movement reflects real Hz difference.
+  // Negative (flat): tighten. Positive (sharp): loosen.
+  const NEEDLE_HZ_RANGE = 12 // ±12 Hz fills full sweep
+  const hzClamped = Math.max(-NEEDLE_HZ_RANGE, Math.min(NEEDLE_HZ_RANGE, detuneHz))
+  const needleDeg = isActive
+    ? (hzClamped / NEEDLE_HZ_RANGE) * (sweepDeg / 2)
+    : 2 // idle: almost zero, slight right bias
   // ±5 cents visual zone (meter display only — in-tune detection uses ±1 Hz)
   const ZONE_CENTS = 5
   const zoneHW  = (ZONE_CENTS / METER_RANGE) * cx
+
+  const arcY = (x: number) => {
+    const half = (arcRight - arcLeft) / 2
+    const norm = (x - cx) / half
+    return arcBaseY - (arcBaseY - arcPeakY) * (1 - norm * norm)
+  }
+
   const ticks   = Array.from({ length: 13 }, (_, i) => {
     const c = -30 + i * 5; const major = c % 10 === 0
-    return { x: cx + (c / METER_RANGE) * cx, major, c }
+    const x = cx + (c / METER_RANGE) * (cx - arcLeft)
+    const y2 = arcY(x)
+    const y1 = y2 - (major ? 10 : 6)
+    return { x, y1, y2, major, c }
   })
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block" }} aria-hidden>
-      <line x1={16} y1={trackY} x2={W - 16} y2={trackY} stroke="var(--separator)" strokeWidth={1} />
-      {ticks.map(({ x, major, c }) => (
-        <line key={c} x1={x} y1={trackY - (major ? 14 : 8)} x2={x} y2={trackY}
+      <path d={`M ${arcLeft},${arcBaseY} Q ${cx},${arcPeakY} ${arcRight},${arcBaseY}`}
+        fill="none" stroke="var(--separator)" strokeWidth={1.2} />
+      {ticks.map(({ x, y1, y2, major, c }) => (
+        <line key={c} x1={x} y1={y1} x2={x} y2={y2}
           stroke={major ? "rgba(60,60,67,0.25)" : "rgba(60,60,67,0.12)"}
           strokeWidth={major ? 1.2 : 0.7} />
       ))}
-      {/* In-tune zone triangle */}
-      <path d={`M ${cx - zoneHW},${zoneTop} L ${cx + zoneHW},${zoneTop} L ${cx},${trackY} Z`}
+      {/* In-tune zone wedge for arc meter */}
+      <path d={`M ${cx - zoneHW},${arcPeakY} L ${cx + zoneHW},${arcPeakY} L ${cx},${pivotY - 6} Z`}
         fill={inTune ? "rgba(52,199,89,0.22)" : "rgba(52,199,89,0.10)"}
         style={{ transition: "fill 0.4s ease" }} />
-      <path d={`M ${cx - zoneHW},${zoneTop} L ${cx + zoneHW},${zoneTop} L ${cx},${trackY} Z`}
+      <path d={`M ${cx - zoneHW},${arcPeakY} L ${cx + zoneHW},${arcPeakY} L ${cx},${pivotY - 6} Z`}
         fill="none" stroke={inTune ? "rgba(52,199,89,0.55)" : "rgba(52,199,89,0.22)"} strokeWidth={0.8}
         style={{ transition: "stroke 0.4s ease" }} />
-      {/* Needle */}
-      {isActive && (
-        <>
-          <line x1={needleX} y1={zoneTop - 2} x2={needleX} y2={trackY + 8}
-            stroke={inTune ? "#34C759" : "var(--primary)"} strokeWidth={2} strokeLinecap="round"
-            style={{ transition: "x1 120ms cubic-bezier(0.22,1,0.36,1), x2 120ms cubic-bezier(0.22,1,0.36,1), stroke 0.3s ease" }} />
-          <circle cx={needleX} cy={trackY + 5} r={3.5}
-            fill={inTune ? "#34C759" : "var(--primary)"}
-            style={{ transition: "cx 120ms cubic-bezier(0.22,1,0.36,1), fill 0.3s ease" }} />
-        </>
-      )}
+      {/* Speedometer-style needle:
+          fixed pivot at center, only rotation changes */}
+      <g
+        style={{
+          transformOrigin: `${cx}px ${pivotY}px`,
+          transform: `rotate(${needleDeg}deg)`,
+          transition: "transform 120ms cubic-bezier(0.22,1,0.36,1)",
+        }}
+      >
+        <line
+          x1={cx}
+          y1={pivotY}
+          x2={cx}
+          y2={arcPeakY - 2}
+          stroke={isActive ? (inTune ? "#34C759" : "var(--primary)") : "rgba(60,60,67,0.35)"}
+          strokeWidth={2}
+          strokeLinecap="round"
+          style={{ transition: "stroke 0.3s ease" }}
+        />
+      </g>
+      <circle
+        cx={cx}
+        cy={pivotY}
+        r={3.5}
+        fill={isActive ? (inTune ? "#34C759" : "var(--primary)") : "rgba(60,60,67,0.35)"}
+        style={{ transition: "fill 0.3s ease" }}
+      />
     </svg>
   )
 }
@@ -471,9 +508,9 @@ export function ReferenceTuner() {
   const targetString    = activeStringIdx !== null ? s[activeStringIdx] : null
   const targetFreq      = targetString?.freq ?? null
   const cents           = detectedFreq && targetFreq ? centsDifference(detectedFreq, targetFreq) : 0
+  const detuneHz        = detectedFreq && targetFreq ? detectedFreq - targetFreq : 0
   // ±1 Hz absolute frequency check — more musically meaningful than a fixed cents value
   const inTune          = Boolean(detectedFreq && targetFreq && Math.abs(detectedFreq - targetFreq) <= IN_TUNE_HZ)
-  const detectedNote    = detectedFreq ? frequencyToNote(detectedFreq) : null
 
   const status: TuneStatus =
     micError                       ? "idle"      :
@@ -483,12 +520,7 @@ export function ReferenceTuner() {
     cents < 0                      ? "flat"      :
                                      "sharp"
 
-  // Display note: show detected note when listening, else target string name
-  const displayNote = detectedNote
-    ? `${detectedNote.note}${detectedNote.octave}`
-    : targetString
-      ? `${targetString.name}${targetString.octave}`
-      : null
+  const hzDisplay = detectedFreq ? `${detectedFreq.toFixed(1)} Hz` : "0.0 Hz"
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--background)", overflow: "hidden" }}>
@@ -501,14 +533,14 @@ export function ReferenceTuner() {
       {/* ── Note display ── */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 20px 2px", flexShrink: 0 }}>
         <div style={{
-          fontSize: 80, fontWeight: 700, letterSpacing: "-3px", lineHeight: 1,
-          color: displayNote
+          fontSize: 56, fontWeight: 700, letterSpacing: "-1.4px", lineHeight: 1,
+          color: detectedFreq
             ? (inTune && isListening ? "var(--success)" : "var(--foreground)")
             : "rgba(60,60,67,0.18)",
           transition: "color 0.4s ease", fontVariantNumeric: "tabular-nums",
-          minHeight: 80, display: "flex", alignItems: "center",
+          minHeight: 62, display: "flex", alignItems: "center",
         }}>
-          {displayNote ?? "—"}
+          {hzDisplay}
         </div>
         <div style={{ marginTop: 4 }}>
           <StatusBadge status={status} />
@@ -518,7 +550,7 @@ export function ReferenceTuner() {
       {/* ── Horizontal meter ── */}
       <div style={{ padding: "6px 24px 0", flexShrink: 0 }}>
         <HorizontalMeter
-          cents={cents}
+          detuneHz={detuneHz}
           isActive={isListening && detectedFreq !== null}
           inTune={inTune}
         />

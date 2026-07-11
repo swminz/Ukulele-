@@ -258,7 +258,7 @@ export function Settings() {
       <Section label="About">
         <Row
           badge={<Badge color={C.blue}><Info size={16} style={ICON_STYLE} /></Badge>}
-          label="UkePocket"
+          label="My Ukulele Buddy"
           description="Personal ukulele practice companion"
         >
           <span style={{ fontSize: 15, color: "var(--text-tertiary)" }}>v1.0</span>

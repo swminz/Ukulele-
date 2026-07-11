@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { getAllSongs, saveSong, deleteSong } from "@/lib/db"
+import { extractPDFText } from "@/lib/pdf-text"
 import { haptic } from "@/lib/audio"
 import type { Song, SongPDF, SongAudio } from "@/types"
 import { SongCard } from "./SongCard"
@@ -112,13 +113,20 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
   }, [uploadTrigger])
 
   // ── Build a Song object from a File + its ArrayBuffer ────────────────
-  function buildSong(file: File, data: ArrayBuffer): Song | null {
+  async function buildSong(file: File, data: ArrayBuffer): Promise<Song | null> {
     const now   = Date.now()
     const title = file.name.replace(/\.[^.]+$/, "")
     if (isPDF(file.name)) {
+      let parsedText = ""
+      try {
+        parsedText = await extractPDFText(data)
+      } catch {
+        parsedText = ""
+      }
       const pdf: SongPDF = {
         data, filename: file.name, size: file.size,
         uploadedAt: now, lastViewedPage: 1, bookmarks: [],
+        parsedText,
       }
       return { id: makeId(), title, artist: "", content: "", createdAt: now, modifiedAt: now, favorite: false, isUploaded: true, pdf }
     }
@@ -156,7 +164,7 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
           return  // remaining files deferred until dialog resolves
         }
 
-        const song = buildSong(file, data)
+        const song = await buildSong(file, data)
         if (song) await saveSong(song)
       }
     } finally {
@@ -171,7 +179,7 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
     const { file, data, existingSong } = duplicatePending
     setDuplicatePending(null)
     await deleteSong(existingSong.id)
-    const song = buildSong(file, data)
+    const song = await buildSong(file, data)
     if (song) await saveSong(song)
     await load()
   }
@@ -180,7 +188,7 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
     if (!duplicatePending) return
     const { file, data } = duplicatePending
     setDuplicatePending(null)
-    const song = buildSong(file, data)
+    const song = await buildSong(file, data)
     if (song) await saveSong(song)
     await load()
   }

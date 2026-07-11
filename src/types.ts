@@ -6,6 +6,7 @@ export interface SongPDF {
   uploadedAt: number
   lastViewedPage: number
   bookmarks: number[]
+  parsedText?: string
 }
 
 // ── Audio attachment (uploaded reference track) ────────────────────────

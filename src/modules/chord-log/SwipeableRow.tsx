@@ -23,8 +23,10 @@ interface Props {
  * closes any other that is currently revealed.
  */
 export function SwipeableRow({ onDelete, children }: Props) {
+  const rowRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const [open, setOpen]   = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const startX   = useRef(0)
   const baseOff  = useRef(0)
   // True only when the finger actually slid horizontally > threshold
@@ -53,6 +55,19 @@ export function SwipeableRow({ onDelete, children }: Props) {
     window.addEventListener(SWIPE_EVENT, handler)
     return () => window.removeEventListener(SWIPE_EVENT, handler)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close when user taps anywhere outside this row while it's open.
+  // This replaces the fixed backdrop so it never blocks the delete button.
+  useEffect(() => {
+    if (!open) return
+    const onDocDown = (e: PointerEvent) => {
+      const target = e.target as Node | null
+      if (!rowRef.current || !target) return
+      if (!rowRef.current.contains(target)) snap(false, false)
+    }
+    document.addEventListener("pointerdown", onDocDown, true)
+    return () => document.removeEventListener("pointerdown", onDocDown, true)
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return
@@ -103,7 +118,15 @@ export function SwipeableRow({ onDelete, children }: Props) {
   }
 
   return (
-    <div className="swipe-row">
+    <div
+      ref={rowRef}
+      className="swipe-row"
+      style={{
+        opacity: deleting ? 0 : 1,
+        transform: deleting ? "scale(0.985)" : "scale(1)",
+        transition: "opacity 0.16s ease, transform 0.16s ease",
+      }}
+    >
       {/* Red delete action — inset 1 px from top+bottom so it never bleeds
           into the separator hairline that sits at top:0 of the next row */}
       <div
@@ -123,7 +146,12 @@ export function SwipeableRow({ onDelete, children }: Props) {
         }}
       >
         <button
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (deleting) return
+            setDeleting(true)
+            window.setTimeout(() => onDelete(), 150)
+          }}
           aria-label="Delete"
           style={{
             width:          "100%",
@@ -165,14 +193,6 @@ export function SwipeableRow({ onDelete, children }: Props) {
       >
         {children}
       </div>
-
-      {/* Backdrop — tap outside the revealed button to close */}
-      {open && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 5 }}
-          onClick={() => snap(false)}
-        />
-      )}
     </div>
   )
 }
