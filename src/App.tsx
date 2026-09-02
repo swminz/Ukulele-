@@ -159,6 +159,8 @@ export default function App() {
   const [addSongTrigger,    setAddSongTrigger]    = useState(0)
   // Incrementing trigger to tell ChordLog to open the file picker
   const [uploadMusicTrigger, setUploadMusicTrigger] = useState(0)
+  // Incrementing trigger to tell ChordLibrary to open the add-chord sheet
+  const [addChordTrigger,   setAddChordTrigger]   = useState(0)
   const [showMenu,          setShowMenu]           = useState(false)
 
   const addBtnRef = useRef<HTMLButtonElement>(null)
@@ -212,16 +214,22 @@ export default function App() {
           {TAB_TITLES[tab]}
         </h1>
 
-        {/* + button — visible on Songs tab */}
-        {tab === "songs" && (
+        {/* + button — same placement as Songs, also on Chords */}
+        {(tab === "songs" || tab === "chords") && (
           <button
             ref={addBtnRef}
-            onClick={() => setShowMenu((v) => !v)}
-            aria-label="Add song or upload"
-            aria-haspopup="menu"
-            aria-expanded={showMenu}
+            onClick={() => {
+              if (tab === "songs") {
+                setShowMenu((v) => !v)
+              } else {
+                setAddChordTrigger((n) => n + 1)
+              }
+            }}
+            aria-label={tab === "songs" ? "Add song or upload" : "Add custom chord"}
+            aria-haspopup={tab === "songs" ? "menu" : undefined}
+            aria-expanded={tab === "songs" ? showMenu : undefined}
             style={{
-              background:     showMenu ? "rgba(0,122,255,0.8)" : "var(--primary)",
+              background:     tab === "songs" && showMenu ? "rgba(0,122,255,0.8)" : "var(--primary)",
               color:          "#FFFFFF",
               border:         "none",
               borderRadius:   "50%",
@@ -233,7 +241,7 @@ export default function App() {
               cursor:         "pointer",
               flexShrink:     0,
               transition:     "background 0.15s ease, transform 0.12s ease",
-              transform:      showMenu ? "rotate(45deg)" : "rotate(0deg)",
+              transform:      tab === "songs" && showMenu ? "rotate(45deg)" : "rotate(0deg)",
             }}
           >
             <Plus size={18} strokeWidth={2.5} />
@@ -266,7 +274,7 @@ export default function App() {
 
         {tab === "chords" && (
           <div className="h-full flex flex-col overflow-hidden">
-            <ChordLibrary />
+            <ChordLibrary addTrigger={addChordTrigger} />
           </div>
         )}
 

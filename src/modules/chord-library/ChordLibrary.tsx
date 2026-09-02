@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { CHORDS, type ChordData } from "./chords"
 import { ChordDiagram } from "./ChordDiagram"
-import { X, Search, Heart, ChevronLeft, Plus, ImagePlus, Trash2 } from "lucide-react"
+import { X, Search, Heart, ChevronLeft, ImagePlus, Trash2 } from "lucide-react"
 
 const LS_RECENT    = "uke_chords_recent"
 const LS_FAVORITES = "uke_chords_favorites"
@@ -65,6 +65,7 @@ function resizeImage(file: File, maxPx = 800): Promise<string> {
 interface Props {
   initialChord?: string
   onClose?: () => void
+  addTrigger?: number
 }
 
 // ── iOS-style search bar ────────────────────────────────────────────
@@ -113,7 +114,7 @@ function SearchBar({ value, onChange }: { value: string; onChange: (v: string) =
 
 type LibTab = "all" | "favorites" | "recent"
 
-export function ChordLibrary({ initialChord, onClose }: Props) {
+export function ChordLibrary({ initialChord, onClose, addTrigger }: Props) {
   const [query,         setQuery]        = useState(initialChord ?? "")
   const [tab,           setTab]          = useState<LibTab>("all")
   const [selected,      setSelected]     = useState<ChordData | null>(
@@ -130,6 +131,16 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
   const [addImage,      setAddImage]     = useState<string | null>(null)
   const [addSaving,     setAddSaving]    = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const prevAddTrigger = useRef(addTrigger ?? 0)
+  useEffect(() => {
+    if (addTrigger === undefined) return
+    if (addTrigger === prevAddTrigger.current) return
+    prevAddTrigger.current = addTrigger
+    setSelected(null)
+    setSelCustom(null)
+    setShowAdd(true)
+  }, [addTrigger])
 
   const openChord = useCallback((chord: ChordData) => {
     setSelected(chord)
@@ -404,34 +415,8 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--background)" }}>
 
-      {/* ── Top bar: add button above search (prevents accidental tab taps) ── */}
-      <div style={{ padding: "10px 16px 0", flexShrink: 0 }}>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-        <button
-          onClick={() => setShowAdd(true)}
-          aria-label="Add custom chord"
-          style={{
-            width:         40,
-            height:        36,
-            borderRadius:  10,
-            background:    "var(--primary)",
-            border:        "none",
-            cursor:        "pointer",
-            display:       "flex",
-            alignItems:    "center",
-            justifyContent:"center",
-            flexShrink:    0,
-            WebkitTapHighlightColor: "transparent",
-          }}
-        >
-          <Plus size={20} strokeWidth={2.2} style={{ color: "#FFF" }} />
-        </button>
-        </div>
-        <SearchBar value={query} onChange={setQuery} />
-      </div>
-
-      {/* ── Underline tab bar ── */}
-      <div style={{ display: "flex", flexShrink: 0, borderBottom: "1px solid var(--separator)", marginTop: 6 }}>
+      {/* Tab bar — same position as Practice */}
+      <div style={{ display: "flex", flexShrink: 0, borderBottom: "1px solid var(--separator)" }}>
         {TABS.map(({ id, label }) => {
           const active = tab === id
           return (
@@ -447,9 +432,9 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
                 borderBottom:  active ? "2px solid var(--primary)" : "2px solid transparent",
                 marginBottom:  -1,
                 color:         active ? "var(--primary)" : "var(--text-tertiary)",
-                fontSize:      13,
+                fontSize:      15,
                 fontWeight:    active ? 600 : 400,
-                letterSpacing: "-0.1px",
+                letterSpacing: "-0.24px",
                 cursor:        "pointer",
                 transition:    "color 0.15s ease, border-color 0.15s ease",
                 whiteSpace:    "nowrap",
@@ -459,6 +444,10 @@ export function ChordLibrary({ initialChord, onClose }: Props) {
             </button>
           )
         })}
+      </div>
+
+      <div style={{ padding: "10px 16px 0", flexShrink: 0 }}>
+        <SearchBar value={query} onChange={setQuery} />
       </div>
 
       {/* ── Grid content ── */}

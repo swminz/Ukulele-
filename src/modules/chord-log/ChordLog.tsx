@@ -276,13 +276,8 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
       />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--background)" }}>
-        {/* Search */}
-        <div style={{ padding: "10px 16px 0", flexShrink: 0 }}>
-          <SearchBar value={query} onChange={setQuery} />
-        </div>
-
-        {/* ── Tab bar (underline style, matching Practice) ── */}
-        <div style={{ display: "flex", flexShrink: 0, borderBottom: "1px solid var(--separator)", marginTop: 6 }}>
+        {/* Tab bar — same position as Practice */}
+        <div style={{ display: "flex", flexShrink: 0, borderBottom: "1px solid var(--separator)" }}>
           {([["music", "Music Notes"], ["songs", "Songs"]] as [SongsTab, string][]).map(([id, label]) => {
             const active = tab === id
             return (
@@ -309,6 +304,10 @@ export function ChordLog({ addTrigger, uploadTrigger }: Props) {
               </button>
             )
           })}
+        </div>
+
+        <div style={{ padding: "10px 16px 0", flexShrink: 0 }}>
+          <SearchBar value={query} onChange={setQuery} />
         </div>
 
         {/* ── Tab content ── */}
