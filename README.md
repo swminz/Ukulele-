@@ -1,6 +1,6 @@
-# UkePocket
+# MyMusic
 
-A pocket ukulele companion: tuner, metronome, songs, sheet music, and a chord library. Built as a mobile-first PWA that can run in the browser or be added to the home screen.
+MyMusic is a pocket music companion: tuner, metronome, songs, sheet music, and a chord library. Built as a mobile-first PWA that can run in the browser or be added to the home screen.
 
 Repo: [github.com/swminz/Ukulele-](https://github.com/swminz/Ukulele-)
 

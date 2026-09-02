@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "icons/*.png", "icons/*.svg"],
       manifest: {
-        name: "UkePocket",
-        short_name: "UkePocket",
-        description: "Your pocket ukulele companion — tuner, chord log, sheet music & practice tools",
+        name: "MyMusic",
+        short_name: "MyMusic",
+        description: "MyMusic — tuner, songs, sheet music, chords & practice tools",
         theme_color: "#000000",
         background_color: "#000000",
         display: "standalone",
