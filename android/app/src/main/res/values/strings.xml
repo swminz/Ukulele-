@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">UkePocket</string>
+    <string name="title_activity_main">UkePocket</string>
+    <string name="package_name">com.swminz.ukepocket</string>
+    <string name="custom_url_scheme">com.swminz.ukepocket</string>
+</resources>
