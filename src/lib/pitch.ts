@@ -18,13 +18,14 @@
 //  iOS compat • startPitchDetection() MUST be called from a user gesture so
 //               AudioContext.resume() / getUserMedia succeed on Safari.
 
+import { getCtx } from "./audio"
+
 export interface PitchDetectionResult {
   frequency: number | null
   clarity:   number           // 0–1 (MPM peak value)
 }
 
 // ── Module-level Web Audio state ─────────────────────────────────────
-let audioCtx:    AudioContext | null = null
 let mediaStream: MediaStream  | null = null
 let analyser:    AnalyserNode | null = null
 let sourceNode:  MediaStreamAudioSourceNode | null = null
@@ -216,15 +217,17 @@ export async function startPitchDetection(
 ): Promise<void> {
   if (animationId !== null) return   // already running
 
-  // Create AudioContext synchronously inside the user-gesture call stack
-  audioCtx = new AudioContext()
+  const audioCtx = getCtx()
   if (audioCtx.state === "suspended") {
-    try { audioCtx.resume() } catch {}
+    try { await audioCtx.resume() } catch {}
   }
 
+  const isAndroid = typeof window !== "undefined" && (window as any).Capacitor?.getPlatform?.() === "android"
+
   // Request microphone with quality constraints
+  // Relax constraints for Android to prevent initialization failures
   mediaStream = await navigator.mediaDevices.getUserMedia({
-    audio: {
+    audio: isAndroid ? true : {
       echoCancellation: false,
       noiseSuppression: false,
       autoGainControl:  false,
@@ -250,10 +253,19 @@ export async function startPitchDetection(
   // Warm up the median filter
   medianBuf.length = 0
 
+  let frameCount = 0
   const loop = () => {
     if (!analyser || !timeDomainBuf || !audioCtx) return
     analyser.getFloatTimeDomainData(timeDomainBuf)
     const raw = detectPitch(timeDomainBuf, audioCtx.sampleRate)
+
+    // Diagnostic logging every ~1 second (60 frames)
+    if (isAndroid && frameCount++ % 60 === 0) {
+      // Calculate RMS for volume diagnostic
+      let sum = 0; for(let i=0; i<timeDomainBuf.length; i++) sum += timeDomainBuf[i]*timeDomainBuf[i]
+      const rms = Math.sqrt(sum/timeDomainBuf.length)
+      console.log(`[PitchDiag] RMS: ${rms.toFixed(4)}, Freq: ${raw.frequency?.toFixed(1) ?? "null"}, Clarity: ${raw.clarity.toFixed(2)}`)
+    }
 
     // Apply median filter to reject single-frame spikes
     const result: PitchDetectionResult = raw.frequency !== null
@@ -268,11 +280,28 @@ export async function startPitchDetection(
 
 /** Stop pitch detection and release all audio resources. */
 export function stopPitchDetection(): void {
-  if (animationId !== null) { cancelAnimationFrame(animationId); animationId = null }
-  sourceNode?.disconnect();  sourceNode  = null
-  mediaStream?.getTracks().forEach((t) => t.stop()); mediaStream = null
-  audioCtx?.close();         audioCtx   = null
-  analyser      = null
+  if (animationId !== null) {
+    cancelAnimationFrame(animationId)
+    animationId = null
+  }
+
+  try {
+    sourceNode?.disconnect()
+  } catch {}
+  sourceNode = null
+
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => {
+      try { track.stop() } catch {}
+    })
+    mediaStream = null
+  }
+
+  // Note: We no longer close the shared singleton AudioContext here
+  // to avoid breaking other audio features (tuner/metronome sounds).
+  // Just disconnecting the source from the analyser is enough.
+
+  analyser = null
   timeDomainBuf = null
   medianBuf.length = 0
 }

@@ -29,6 +29,15 @@ export function useSettings() {
     })
   }, [])
 
+  // Large text: apply a data attribute to <html> so CSS can scale the app
+  useEffect(() => {
+    if (settings.largeText) {
+      document.documentElement.setAttribute("data-large-text", "true")
+    } else {
+      document.documentElement.removeAttribute("data-large-text")
+    }
+  }, [settings.largeText])
+
   // Wake Lock
   useEffect(() => {
     if (!settings.keepScreenAwake) return

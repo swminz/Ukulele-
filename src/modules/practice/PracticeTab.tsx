@@ -1,12 +1,15 @@
-import { useState } from "react"
 import { ReferenceTuner } from "@/modules/tuner/ReferenceTuner"
-import { Metronome } from "./Metronome"
+import { Metronome, type MetronomeControlProps } from "./Metronome"
 
 type Screen = "tuner" | "metronome"
 
-export function PracticeTab() {
-  const [screen, setScreen] = useState<Screen>("tuner")
+interface PracticeTabProps {
+  screen:         Screen
+  onScreenChange: (s: Screen) => void
+  metronome:      MetronomeControlProps
+}
 
+export function PracticeTab({ screen, onScreenChange, metronome }: PracticeTabProps) {
   return (
     <div
       style={{
@@ -29,7 +32,7 @@ export function PracticeTab() {
           return (
             <button
               key={id}
-              onClick={() => setScreen(id)}
+              onClick={() => onScreenChange(id)}
               aria-pressed={active}
               style={{
                 flex:           1,
@@ -57,7 +60,7 @@ export function PracticeTab() {
       {/* ── Screen content ─────────────────────────────────────────────── */}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
         {screen === "tuner"     && <ReferenceTuner />}
-        {screen === "metronome" && <Metronome />}
+        {screen === "metronome" && <Metronome {...metronome} />}
       </div>
     </div>
   )

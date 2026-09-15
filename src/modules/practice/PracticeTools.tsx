@@ -1,9 +1,4 @@
-import { Metronome } from "./Metronome"
-
+// PracticeTools is currently unused. Kept as a placeholder.
 export function PracticeTools() {
-  return (
-    <section className="pt-2 pb-8">
-      <Metronome />
-    </section>
-  )
+  return null
 }

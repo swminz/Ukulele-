@@ -1,13 +1,28 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useRef } from "react"
 import { createMetronomeClick, haptic } from "@/lib/audio"
-import { useSettings } from "@/hooks/use-settings"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
-const MIN_BPM = 40
-const MAX_BPM = 220
+export const MIN_BPM = 40
+export const MAX_BPM = 220
+
+// ── Shared types / constants (imported by App and MetronomeMiniPlayer) ────────
+export type TimeSig = 2 | 3 | 4
+export const TIME_SIG_CYCLE: TimeSig[] = [2, 3, 4]
+
+export interface MetronomeControlProps {
+  bpm:               number
+  running:           boolean
+  beat:              number
+  timeSig:           TimeSig
+  accentBeat:        number
+  onBpmChange:       (v: number) => void
+  onToggleRunning:   () => void
+  onTimeSigChange:   () => void
+  onAccentBeatChange:(n: number) => void
+}
 
 // ── Tempo labels ──────────────────────────────────────────────────────────────
-function tempoLabel(bpm: number): string {
+export function tempoLabel(bpm: number): string {
   if (bpm < 60)  return "Largo"
   if (bpm < 66)  return "Larghetto"
   if (bpm < 76)  return "Adagio"
@@ -19,22 +34,6 @@ function tempoLabel(bpm: number): string {
   return "Prestissimo"
 }
 
-type TimeSig = 2 | 3 | 4
-const TIME_SIG_CYCLE: TimeSig[] = [2, 3, 4]
-
-// ── Voice recognition wiring ──────────────────────────────────────────────────
-const SPEECH_SUPPORTED =
-  typeof window !== "undefined" &&
-  ("SpeechRecognition" in (window as unknown as Record<string, unknown>) ||
-    "webkitSpeechRecognition" in (window as unknown as Record<string, unknown>))
-
-type SRLike = {
-  continuous: boolean; interimResults: boolean; lang: string
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
-  onerror: (() => void) | null; onend: (() => void) | null
-  start: () => void; stop: () => void
-}
-type SRCtor = new () => SRLike
 
 // ── Circular tempo wheel ──────────────────────────────────────────────────────
 // 270° sweep: -135° (7 o'clock, BPM=40) … +135° (5 o'clock, BPM=220)
@@ -210,81 +209,14 @@ function TempoWheel({ bpm, running, beat, onBpmChange, onToggle }: WheelProps) {
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-export function Metronome() {
-  const { settings, updateSettings } = useSettings()
-  const [bpm,          setBpmState]  = useState(settings.metronome.bpm)
-  const [running,      setRunning]   = useState(false)
-  const [beat,         setBeat]      = useState(0)
-  const [timeSig,      setTimeSig]   = useState<TimeSig>(4)
-  const [accentBeat,   setAccentBeat] = useState(1)   // which beat number is accented
-
-  const beatCountRef = useRef(0)
-  const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
-  const runningRef   = useRef(false)
-
-  const setBpm = (v: number) => {
-    const clamped = Math.max(MIN_BPM, Math.min(MAX_BPM, v))
-    setBpmState(clamped)
-    updateSettings({ metronome: { ...settings.metronome, bpm: clamped } })
-  }
-
-  const tick = useCallback(() => {
-    beatCountRef.current = (beatCountRef.current % timeSig) + 1
-    const next     = beatCountRef.current
-    const isAccent = next === accentBeat
-    createMetronomeClick(isAccent)
-    if (settings.hapticFeedback) haptic(isAccent ? [5, 0, 5] : 5)
-    setBeat(next)
-    setTimeout(() => setBeat(0), 90)
-  }, [timeSig, accentBeat, settings.hapticFeedback])
-
-  useEffect(() => {
-    if (!running) { if (intervalRef.current) clearInterval(intervalRef.current); return }
-    const ms = (60 / bpm) * 1000
-    tick()
-    intervalRef.current = setInterval(tick, ms)
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [running, bpm, tick])
-
-  useEffect(() => { runningRef.current = running }, [running])
-
-  const toggleRunning = () => {
-    haptic(15)
-    if (running) beatCountRef.current = 0
-    setRunning((v) => !v)
-  }
-
-  const handleTimeSig = () => {
-    const idx = TIME_SIG_CYCLE.indexOf(timeSig)
-    const next = TIME_SIG_CYCLE[(idx + 1) % TIME_SIG_CYCLE.length]
-    setTimeSig(next)
-    beatCountRef.current = 0
-    setBeat(0)
-    if (accentBeat > next) setAccentBeat(1)
-  }
-
-  // Passive voice recognition
-  useEffect(() => {
-    if (!SPEECH_SUPPORTED) return
-    const win  = window as unknown as { SpeechRecognition?: SRCtor; webkitSpeechRecognition?: SRCtor }
-    const Ctor = (win.SpeechRecognition || win.webkitSpeechRecognition) as SRCtor | undefined
-    if (!Ctor) return
-    const rec      = new Ctor()
-    rec.continuous = true; rec.interimResults = false; rec.lang = "en-US"
-    rec.onresult = (e) => {
-      const t = e.results[e.results.length - 1]?.[0]?.transcript?.trim().toLowerCase()
-      if (t === "play" && !runningRef.current) setRunning(true)
-      if (t === "stop" && runningRef.current)  setRunning(false)
-    }
-    rec.onerror = () => {}
-    rec.onend   = () => {
-      if (document.visibilityState === "visible") try { rec.start() } catch {}
-    }
-    try { rec.start() } catch {}
-    return () => { rec.onend = null; rec.stop() }
-  }, [])
-
+// ── Main component — now a pure display/control component.
+// All state and the setInterval live in App.tsx so the metronome persists
+// across navigation. Props come down via MetronomeControlProps.
+// ────────────────────────────────────────────────────────────────────────────
+export function Metronome({
+  bpm, running, beat, timeSig, accentBeat,
+  onBpmChange, onToggleRunning, onTimeSigChange, onAccentBeatChange,
+}: MetronomeControlProps) {
   const label = tempoLabel(bpm)
 
   return (
@@ -308,7 +240,7 @@ export function Metronome() {
         {/* BPM row */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
-            onClick={() => setBpm(bpm - 1)}
+            onClick={() => onBpmChange(bpm - 1)}
             onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.88)" }}
             onPointerUp={(e)   => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"   }}
             onPointerCancel={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)" }}
@@ -338,7 +270,7 @@ export function Metronome() {
           </div>
 
           <button
-            onClick={() => setBpm(bpm + 1)}
+            onClick={() => onBpmChange(bpm + 1)}
             onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.88)" }}
             onPointerUp={(e)   => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"   }}
             onPointerCancel={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)" }}
@@ -363,7 +295,7 @@ export function Metronome() {
           Time Signature
         </p>
         <button
-          onClick={handleTimeSig}
+          onClick={onTimeSigChange}
           aria-label={`Time signature ${timeSig}/4 — tap to cycle`}
           style={{
             display:       "flex",
@@ -400,7 +332,7 @@ export function Metronome() {
             return (
               <button
                 key={n}
-                onClick={() => setAccentBeat(n)}
+                onClick={() => onAccentBeatChange(n)}
                 aria-label={`Accent beat ${n}`}
                 aria-pressed={active}
                 style={{
@@ -440,8 +372,8 @@ export function Metronome() {
             bpm={bpm}
             running={running}
             beat={beat}
-            onBpmChange={setBpm}
-            onToggle={toggleRunning}
+            onBpmChange={onBpmChange}
+            onToggle={onToggleRunning}
           />
         </div>
       </div>

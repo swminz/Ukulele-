@@ -1,7 +1,7 @@
 // ── Web Audio context (singleton) ────────────────────────────────────
 let ctx: AudioContext | null = null
 
-function getCtx(): AudioContext {
+export function getCtx(): AudioContext {
   if (!ctx || ctx.state === "closed") {
     ctx = new AudioContext()
   }
@@ -121,36 +121,45 @@ export function createMetronomeClick(accent = false): void {
   if (context.state === "suspended") context.resume()
 
   const now = context.currentTime
-
-  // ── Output compressor — pushes perceived loudness to the ceiling ──
-  const comp = context.createDynamicsCompressor()
-  comp.threshold.value = -3     // dBFS
-  comp.knee.value      = 0
-  comp.ratio.value     = 6
-  comp.attack.value    = 0.0005
-  comp.release.value   = 0.08
-  comp.connect(context.destination)
+  const isAndroid = typeof window !== "undefined" && (window as any).Capacitor?.getPlatform?.() === "android"
 
   // ── Master gain ───────────────────────────────────────────────────
   const master = context.createGain()
-  master.gain.value = accent ? 2.0 : 1.4
-  master.connect(comp)
+
+  if (isAndroid) {
+    // Android Emulator workaround: bypass compressor which can squash transients,
+    // and use a direct, boosted gain path for better audibility.
+    master.gain.setValueAtTime(accent ? 1.0 : 0.7, now)
+    master.connect(context.destination)
+  } else {
+    // Standard Safari/PWA path: use compressor for maximum headroom
+    const comp = context.createDynamicsCompressor()
+    comp.threshold.value = -3     // dBFS
+    comp.knee.value      = 0
+    comp.ratio.value     = 6
+    comp.attack.value    = 0.0005
+    comp.release.value   = 0.08
+    comp.connect(context.destination)
+
+    master.gain.value = accent ? 2.0 : 1.4
+    master.connect(comp)
+  }
 
   // ── Layer 1: sine-tone body (punchy, audible through any mix) ─────
   const toneFreq = accent ? 1050 : 700
   const tone = context.createOscillator()
   tone.type = "sine"
-  tone.frequency.value = toneFreq
+  tone.frequency.setValueAtTime(toneFreq, now)
 
   const toneEnv = context.createGain()
   toneEnv.gain.setValueAtTime(0, now)
   toneEnv.gain.linearRampToValueAtTime(1.0, now + 0.001)   // instant attack
-  toneEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.06) // fast decay
+  toneEnv.gain.exponentialRampToValueAtTime(0.001, now + (isAndroid ? 0.08 : 0.06)) // slightly longer on Android
 
   tone.connect(toneEnv)
   toneEnv.connect(master)
   tone.start(now)
-  tone.stop(now + 0.07)
+  tone.stop(now + 0.1)
 
   // ── Layer 2: high-frequency noise burst (click transient / tick) ──
   const nBuf  = Math.ceil(context.sampleRate * 0.025)
@@ -165,10 +174,10 @@ export function createMetronomeClick(accent = false): void {
 
   const hp = context.createBiquadFilter()
   hp.type = "highpass"
-  hp.frequency.value = 3500   // keep only the crisp tick portion
+  hp.frequency.setValueAtTime(3500, now)   // keep only the crisp tick portion
 
   const noiseGain = context.createGain()
-  noiseGain.gain.value = accent ? 1.2 : 0.8
+  noiseGain.gain.setValueAtTime(accent ? 1.2 : 0.8, now)
 
   noise.connect(hp)
   hp.connect(noiseGain)
@@ -199,6 +208,30 @@ export function playTimerDone(): void {
     osc.start(startTime)
     osc.stop(startTime + 1.0)
   })
+}
+
+// ── Tuned confirmation chime ──────────────────────────────────────────
+// Single soft note played once when a string enters the in-tune zone.
+// Gain kept very low (0.07) so it never startles.
+export function playTunedChime(): void {
+  const context = getCtx()
+  if (context.state === "suspended") context.resume()
+
+  const now  = context.currentTime
+  const osc  = context.createOscillator()
+  const gain = context.createGain()
+
+  osc.type = "sine"
+  osc.frequency.value = 1046.5  // C6 — bright but gentle
+
+  gain.gain.setValueAtTime(0, now)
+  gain.gain.linearRampToValueAtTime(0.07, now + 0.012)       // 12 ms soft attack
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35) // 350 ms gentle decay
+
+  osc.connect(gain)
+  gain.connect(context.destination)
+  osc.start(now)
+  osc.stop(now + 0.4)
 }
 
 // ── Haptic ────────────────────────────────────────────────────────────

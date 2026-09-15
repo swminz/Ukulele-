@@ -1,8 +1,12 @@
+import { readFileSync } from "fs"
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 import { VitePWA } from "vite-plugin-pwa"
+
+// Read version from package.json at build/dev time so Settings always reflects the current version.
+const { version: APP_VERSION } = JSON.parse(readFileSync("package.json", "utf-8")) as { version: string }
 
 export default defineConfig({
   plugins: [
@@ -39,6 +43,10 @@ export default defineConfig({
       },
     }),
   ],
+  define: {
+    // Injected from package.json — use as __APP_VERSION__ in source code.
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

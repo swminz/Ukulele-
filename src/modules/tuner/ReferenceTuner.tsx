@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react"
-import { playString, stopString, haptic } from "@/lib/audio"
+import { playString, stopString, haptic, playTunedChime } from "@/lib/audio"
 import {
   startPitchDetection,
   stopPitchDetection,
@@ -40,7 +40,6 @@ const TUNINGS: TuningPreset[] = [
 ]
 
 const TUNING_KEY  = "ukepocket_tuning"
-const METER_RANGE = 30   // ±30 cents full-scale
 
 // ── Backend tuning constants ───────────────────────────────────────────────────
 // IN_TUNE_HZ: absolute Hz tolerance for "In Tune" — ±1 Hz as specified.
@@ -265,7 +264,7 @@ function StringBtn({ name, isSelected, isAuto, inTune, isListening, onClick }: S
 // ── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: TuneStatus }) {
   const cfg = {
-    idle:      { text: "Tap button and pluck your string", color: "var(--text-tertiary)" },
+    idle:      { text: "Start playing",                     color: "var(--text-tertiary)" },
     listening: { text: "Start playing",                     color: "var(--text-tertiary)" },
     flat:      { text: "Tune higher",                       color: "var(--destructive)"   },
     sharp:     { text: "Tune lower",                        color: "var(--warning)"       },
@@ -344,101 +343,91 @@ function TuningPicker({ current, options, onChange }: {
 interface MeterProps { detuneHz: number; isActive: boolean; inTune: boolean }
 
 function HorizontalMeter({ detuneHz, isActive, inTune }: MeterProps) {
-  const W = 300, H = 72, cx = W / 2
-  const arcLeft = 16
-  const arcRight = W - 16
-  const arcBaseY = 56
-  const arcPeakY = 22
-  const pivotY = 60
-  const sweepDeg = 60 // total sweep: -30° (flat) to +30° (sharp)
-  // Drive needle by absolute frequency delta so movement reflects real Hz difference.
-  // Negative (flat): tighten. Positive (sharp): loosen.
-  const NEEDLE_HZ_RANGE = 12 // ±12 Hz fills full sweep
+  const W = 280, H = 62
+  const cx = W / 2
+  // Track sits lower to give the needle stem clear space above it
+  const TRACK_Y    = 46
+  const TRACK_H    = 5      // grey groove height
+  const ZONE_H     = 13     // green zone is taller than the track — reads as a raised target band
+  const TRACK_X1   = 14
+  const TRACK_X2   = W - 14  // 266
+  const HALF_TRACK = (TRACK_X2 - TRACK_X1) / 2  // 126 px
+
+  // Needle math — unchanged: ±12 Hz fills ±half-track.
+  const NEEDLE_HZ_RANGE = 12
   const hzClamped = Math.max(-NEEDLE_HZ_RANGE, Math.min(NEEDLE_HZ_RANGE, detuneHz))
-  const needleDeg = isActive
-    ? (hzClamped / NEEDLE_HZ_RANGE) * (sweepDeg / 2)
-    : 0 // idle: perfectly centered vertical needle
-  // ±5 cents visual zone (meter display only — in-tune detection uses ±1 Hz)
-  const ZONE_CENTS = 5
-  const zoneHW  = (ZONE_CENTS / METER_RANGE) * cx
+  const rawOffset = isActive ? (hzClamped / NEEDLE_HZ_RANGE) * HALF_TRACK : 0
 
-  const arcY = (x: number) => {
-    const half = (arcRight - arcLeft) / 2
-    const norm = (x - cx) / half
-    return arcBaseY - (arcBaseY - arcPeakY) * (1 - norm * norm)
-  }
+  // Zone width: ±1 Hz (IN_TUNE_HZ) mapped to display — NOT widened.
+  const zoneHW = (IN_TUNE_HZ / NEEDLE_HZ_RANGE) * HALF_TRACK  // ≈ 10.5 px per side
 
-  const ticks   = Array.from({ length: 13 }, (_, i) => {
-    const c = -30 + i * 5; const major = c % 10 === 0
-    const x = cx + (c / METER_RANGE) * (cx - arcLeft)
-    const y2 = arcY(x)
-    const y1 = y2 - (major ? 10 : 6)
-    const ly = y1 - 5
-    return { x, y1, y2, major, c, ly }
-  })
+  const needleColor = isActive
+    ? (inTune ? "#34C759" : "var(--primary)")
+    : "rgba(120,120,128,0.30)"
+  const zoneColor = inTune
+    ? "rgba(52,199,89,0.68)"
+    : "rgba(52,199,89,0.42)"
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block" }} aria-hidden>
-      <path d={`M ${arcLeft},${arcBaseY} Q ${cx},${arcPeakY} ${arcRight},${arcBaseY}`}
-        fill="none" stroke="var(--text-tertiary)" strokeWidth={1.3} opacity={0.42} />
-      {ticks.map(({ x, y1, y2, major, c }) => (
-        <line key={c} x1={x} y1={y1} x2={x} y2={y2}
-          stroke="var(--text-tertiary)"
-          opacity={major ? 0.58 : 0.32}
-          strokeWidth={major ? 1.2 : 0.7} />
-      ))}
-      {/* Subtle arc numbers (major only) */}
-      {ticks
-        .filter(({ major, c }) => major && c !== 0)
-        .map(({ x, ly, c }) => (
-          <text
-            key={`lbl-${c}`}
-            x={x}
-            y={ly}
-            textAnchor="middle"
-            fontSize={9}
-            fontWeight={600}
-            letterSpacing={0.1}
-            fill="var(--text-tertiary)"
-            opacity={0.6}
-            style={{ userSelect: "none" }}
-          >
-            {c > 0 ? `+${c}` : `${c}`}
-          </text>
-        ))}
-      {/* In-tune zone wedge for arc meter */}
-      <path d={`M ${cx - zoneHW},${arcPeakY} L ${cx + zoneHW},${arcPeakY} L ${cx},${pivotY - 6} Z`}
-        fill={inTune ? "rgba(52,199,89,0.22)" : "rgba(52,199,89,0.10)"}
-        style={{ transition: "fill 0.4s ease" }} />
-      <path d={`M ${cx - zoneHW},${arcPeakY} L ${cx + zoneHW},${arcPeakY} L ${cx},${pivotY - 6} Z`}
-        fill="none" stroke={inTune ? "rgba(52,199,89,0.55)" : "rgba(52,199,89,0.22)"} strokeWidth={0.8}
-        style={{ transition: "stroke 0.4s ease" }} />
-      {/* Speedometer-style needle:
-          fixed pivot at center, only rotation changes */}
-      <g
-        style={{
-          transformOrigin: `${cx}px ${pivotY}px`,
-          transform: `rotate(${needleDeg}deg)`,
-          transition: "transform 120ms cubic-bezier(0.22,1,0.36,1)",
-        }}
-      >
+
+      {/* Grey track — subtle full-width groove */}
+      <rect
+        x={TRACK_X1} y={TRACK_Y - TRACK_H / 2}
+        width={TRACK_X2 - TRACK_X1} height={TRACK_H}
+        rx={TRACK_H / 2}
+        fill="rgba(120,120,128,0.18)"
+      />
+
+      {/* Green target zone — intentionally taller than the grey track so it
+          reads as a clearly raised target band, not a colored track segment.
+          Width = 2 × (IN_TUNE_HZ / 12) × HALF_TRACK ≈ 21 px — exact ±1 Hz
+          tolerance, not widened. rx = ZONE_H/2 = 6.5 gives clean pill ends
+          (no dots — pill is 21 px wide × 13 px tall, well above the aspect
+          where it collapses to ovals). */}
+      <rect
+        x={cx - zoneHW} y={TRACK_Y - ZONE_H / 2}
+        width={zoneHW * 2} height={ZONE_H}
+        rx={ZONE_H / 2}
+        fill={zoneColor}
+        style={{ transition: "fill 0.35s ease" }}
+      />
+
+      {/* Center marker — hairline inside the zone at exact target pitch */}
+      <line
+        x1={cx} y1={TRACK_Y - ZONE_H / 2 + 2}
+        x2={cx} y2={TRACK_Y + ZONE_H / 2 - 2}
+        stroke={inTune ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.35)"}
+        strokeWidth={1} strokeLinecap="round"
+        style={{ transition: "stroke 0.35s ease" }}
+      />
+
+      {/* Needle — thin stem rising above the track with a dot at the base.
+          Pointing DOWN onto the track (dot at TRACK_Y) reads as a cursor/
+          indicator resting on a scale — natural tuner metaphor.
+          Slides left = flat, right = sharp. Green only when inTune is true. */}
+      <g style={{
+        transform: `translateX(${rawOffset}px)`,
+        transition: "transform 120ms cubic-bezier(0.22,1,0.36,1)",
+      }}>
+        {/* Stem — rises from track up into open SVG space */}
         <line
-          x1={cx}
-          y1={pivotY}
-          x2={cx}
-          y2={arcPeakY - 2}
-          stroke={isActive ? (inTune ? "#34C759" : "var(--primary)") : "var(--text-tertiary)"}
-          strokeWidth={2}
+          x1={cx} y1={TRACK_Y - 22}
+          x2={cx} y2={TRACK_Y}
+          stroke={needleColor}
+          strokeWidth={1.5}
           strokeLinecap="round"
-          style={{ transition: "stroke 0.3s ease" }}
+          style={{ transition: "stroke 0.25s ease" }}
+        />
+        {/* Dot — sits on track, anchors the needle to the scale */}
+        <circle
+          cx={cx} cy={TRACK_Y}
+          r={3.5}
+          fill={needleColor}
+          style={{ transition: "fill 0.25s ease" }}
         />
       </g>
-      <circle
-        cx={cx}
-        cy={pivotY}
-        r={3.5}
-        fill={isActive ? (inTune ? "#34C759" : "var(--primary)") : "var(--text-tertiary)"}
-        style={{ transition: "fill 0.3s ease" }}
-      />
+
     </svg>
   )
 }
@@ -448,8 +437,8 @@ export function ReferenceTuner() {
   const [tuningId,        setTuningId]        = useState<string>(() => {
     try { return localStorage.getItem(TUNING_KEY) ?? "standard" } catch { return "standard" }
   })
-  // User's explicitly selected string (tap on a button)
-  const [selectedString,  setSelectedString]  = useState<number | null>(null)
+  // User's explicitly selected string — default 0 (G) so idle state shows a note name
+  const [selectedString,  setSelectedString]  = useState<number | null>(0)
   // Auto-detected closest string (from mic)
   const [autoString,      setAutoString]      = useState<number | null>(null)
   const [detectedFreq,    setDetectedFreq]    = useState<number | null>(null)
@@ -460,6 +449,9 @@ export function ReferenceTuner() {
   // Exponential moving average for frequency smoothing
   const freqEMA = useRef(0)
 
+  // Track previous inTune state so the chime fires only on the 0→1 transition
+  const prevInTune = useRef(false)
+
   const tuning  = TUNINGS.find((t) => t.id === tuningId) ?? TUNINGS[0]
   const s       = tuning.strings
 
@@ -467,8 +459,14 @@ export function ReferenceTuner() {
 
   // ── Start pitch detection ── must be called from a user gesture ──────
   const startListening = useCallback(async () => {
-    if (hasStarted) return
+    // If already listening, don't start again
+    if (isListening) return
+
     setMicError(false)
+
+    // Ensure we clean up any previous failed attempts or dangling contexts
+    stopPitchDetection()
+
     try {
       await startPitchDetection((result: PitchDetectionResult) => {
         if (result.frequency && result.clarity >= CLARITY_MIN) {
@@ -496,11 +494,15 @@ export function ReferenceTuner() {
       })
       setIsListening(true)
       setHasStarted(true)
-    } catch {
+      setMicError(false) // Clear error on success
+    } catch (err) {
+      console.error("Microphone access failed:", err)
       setMicError(true)
       setIsListening(false)
+      setHasStarted(false)
+      stopPitchDetection()
     }
-  }, [hasStarted, tuning])
+  }, [isListening, tuning])
 
   // Stop everything on unmount or tuning change
   useEffect(() => {
@@ -509,7 +511,7 @@ export function ReferenceTuner() {
 
   useEffect(() => {
     stopString()
-    setSelectedString(null)
+    setSelectedString(0)  // reset to first string on tuning change
     setAutoString(null)
     setDetectedFreq(null)
     freqEMA.current = 0
@@ -542,53 +544,69 @@ export function ReferenceTuner() {
     cents < 0                      ? "flat"      :
                                      "sharp"
 
-  const hzDisplay = detectedFreq ? `${detectedFreq.toFixed(1)} Hz` : "0.0 Hz"
+  const hzDisplay = detectedFreq ? `${detectedFreq.toFixed(1)} Hz` : "0 Hz"
+
+  // ── One-time confirmation chime on entering tuned state ───────────────
+  // Fires only when transitioning false → true while the mic is active.
+  // If pitch drifts out then back in, the chime plays again (expected).
+  useEffect(() => {
+    const nowTuned = inTune && isListening
+    if (nowTuned && !prevInTune.current) {
+      playTunedChime()
+    }
+    prevInTune.current = nowTuned
+  }, [inTune, isListening])
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--background)", overflow: "hidden" }}>
 
       {/* ── Tuning preset ── */}
-      <div style={{ padding: "14px 20px 0", flexShrink: 0 }}>
+      <div style={{ padding: "10px 20px 0", flexShrink: 0 }}>
         <TuningPicker current={tuning} options={TUNINGS} onChange={setTuningId} />
       </div>
 
-      {/* ── Note display ── */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 20px 0", flexShrink: 0 }}>
-        <div style={{
-          fontSize: 46, fontWeight: 700, letterSpacing: "-1.0px", lineHeight: 1,
-          color: detectedFreq
-            ? (inTune && isListening ? "var(--success)" : "var(--foreground)")
-            : "var(--text-tertiary)",
-          opacity: detectedFreq ? 1 : 0.72,
-          transition: "color 0.4s ease", fontVariantNumeric: "tabular-nums",
-          minHeight: 54, display: "flex", alignItems: "center",
-        }}>
-          {hzDisplay}
+      {/* ── Tuning feedback ── */}
+      <div style={{ padding: "6px 24px 0", flexShrink: 0 }}>
+
+        {/* Note name — large primary */}
+        <div style={{ textAlign: "center", lineHeight: 1, marginBottom: 1 }}>
+          <span style={{
+            fontSize: 52, fontWeight: 700, letterSpacing: "-1.5px",
+            color: inTune && isListening && detectedFreq
+              ? "var(--success)"
+              : targetString ? "var(--foreground)" : "var(--text-tertiary)",
+            transition: "color 0.35s ease",
+          }}>
+            {targetString ? targetString.name : "—"}
+          </span>
         </div>
-        <div style={{ marginTop: 4 }}>
+
+        {/* Detected frequency — secondary */}
+        <div style={{ textAlign: "center", marginBottom: 3 }}>
+          <span style={{
+            fontSize: 14, fontWeight: 400,
+            color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums",
+          }}>
+            {hzDisplay}
+          </span>
+        </div>
+
+        {/* Status text */}
+        <div style={{ textAlign: "center", marginBottom: 5 }}>
           <StatusBadge status={status} />
         </div>
-      </div>
 
-      {/* ── Horizontal meter ── */}
-      <div style={{ padding: "12px 24px 0", flexShrink: 0 }}>
-        <div style={{ textAlign: "center", marginBottom: 6, minHeight: 36 }}>
-          <p style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.6px", lineHeight: 1.05, color: "var(--foreground)", margin: 0 }}>
-            {targetString ? `${targetString.name}${targetString.octave}` : "—"}
-          </p>
-          <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.2px", color: "var(--text-tertiary)", margin: 0, marginTop: 2 }}>
-            {targetFreq ? targetFreq.toFixed(1) : "0.0"}
-          </p>
-        </div>
+        {/* Linear tuning meter */}
         <HorizontalMeter
           detuneHz={detuneHz}
           isActive={isListening && detectedFreq !== null}
           inTune={inTune}
         />
-        <div style={{ display: "flex", justifyContent: "space-between", padding: "0 14px" }}>
-          <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500 }}>Flat</span>
-          <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500 }}>Sharp</span>
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 10px 0" }}>
+          <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500, opacity: 0.7 }}>Flat</span>
+          <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500, opacity: 0.7 }}>Sharp</span>
         </div>
+
       </div>
 
       {/* ── Headstock + string buttons ─────────────────────────────────── */}
@@ -623,27 +641,30 @@ export function ReferenceTuner() {
         </div>
       </div>
 
-      {/* ── Mic error banner ── */}
-      {micError && (
-        <div style={{ padding: "0 16px calc(var(--safe-bottom) + 10px)", flexShrink: 0 }}>
-          <div style={{
-            background: "rgba(255,59,48,0.08)", borderRadius: 12, padding: "12px 14px",
-            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Mic size={18} strokeWidth={1.5} style={{ color: "var(--destructive)", flexShrink: 0 }} />
-              <p style={{ fontSize: 14, fontWeight: 500, color: "var(--destructive)", margin: 0 }}>
-                Microphone access required
+      {/* ── Mic status / permission prompt ── */}
+      {micError && !isListening && (
+        <div style={{ padding: "0 20px", flexShrink: 0 }}>
+          <button
+            onClick={startListening}
+            style={{
+              width: "100%", background: "rgba(255,59,48,0.06)", border: "1px solid rgba(255,59,48,0.15)",
+              borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10,
+              cursor: "pointer", transition: "background 0.2s ease",
+            }}
+          >
+            <Mic size={16} strokeWidth={2} style={{ color: "var(--destructive)" }} />
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--destructive)", margin: 0 }}>
+                Microphone Disabled
+              </p>
+              <p style={{ fontSize: 11, color: "var(--destructive)", opacity: 0.8, margin: 0 }}>
+                Tap to allow access for the tuner
               </p>
             </div>
-            <button onClick={startListening} style={{
-              background: "var(--destructive)", color: "#FFFFFF", border: "none",
-              borderRadius: 8, padding: "5px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0,
-            }}>Allow</button>
-          </div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--destructive)" }}>Allow</span>
+          </button>
         </div>
       )}
-
 
       <style>{`
         @keyframes stringPulse {

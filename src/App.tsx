@@ -1,10 +1,17 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { PracticeTab } from "@/modules/practice/PracticeTab"
 import { ChordLog } from "@/modules/chord-log/ChordLog"
 import { ChordLibrary } from "@/modules/chord-library/ChordLibrary"
 import { Settings } from "@/modules/settings/Settings"
+import { StartupSplash } from "@/components/StartupSplash"
+import { MetronomeMiniPlayer } from "@/components/MetronomeMiniPlayer"
 import { migratePDFsToSongs } from "@/lib/db"
-import { stopString } from "@/lib/audio"
+import { stopString, createMetronomeClick, haptic } from "@/lib/audio"
+import {
+  MIN_BPM, MAX_BPM,
+  TIME_SIG_CYCLE, type TimeSig,
+} from "@/modules/practice/Metronome"
+import { useSettings } from "@/hooks/use-settings"
 import {
   Music2, BookOpen, Grid3x3, Settings as SettingsIcon, Plus,
   Music, FilePlus,
@@ -147,6 +154,8 @@ function ContextMenu({ options, onSelect, onDismiss, anchorRef }: ContextMenuPro
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
+  const { settings, updateSettings } = useSettings()
+
   const [tab, setTab] = useState<TabId>(() => {
     try {
       const s = localStorage.getItem("ukepocket_last_tab")
@@ -164,6 +173,91 @@ export default function App() {
   const [showMenu,          setShowMenu]           = useState(false)
 
   const addBtnRef = useRef<HTMLButtonElement>(null)
+
+  // ── Practice sub-screen (lifted so App knows when Metronome is visible) ──
+  const [practiceScreen, setPracticeScreen] = useState<"tuner" | "metronome">("tuner")
+
+  // ── Metronome state — lifted so the interval survives navigation ──────────
+  const [metBpm,        setMetBpmState]   = useState<number>(() => settings.metronome.bpm)
+  const [metRunning,    setMetRunning]    = useState(false)
+  // metActive tracks whether a metronome SESSION is live (true from first play,
+  // false only when the user explicitly stops via the × button).
+  // showMiniPlayer depends on metActive, NOT metRunning, so pausing doesn't
+  // dismiss the mini-player.
+  const [metActive,     setMetActive]     = useState(false)
+  const [metBeat,       setMetBeat]       = useState(0)
+  const [metTimeSig,    setMetTimeSig]    = useState<TimeSig>(4)
+  const [metAccentBeat, setMetAccentBeat] = useState(1)
+
+  const metIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+  const metBeatCountRef = useRef(0)
+
+  // Persist BPM and clamp to valid range
+  const setMetBpm = useCallback((v: number) => {
+    const clamped = Math.max(MIN_BPM, Math.min(MAX_BPM, v))
+    setMetBpmState(clamped)
+    updateSettings({ metronome: { ...settings.metronome, bpm: clamped } })
+  }, [settings.metronome, updateSettings])
+
+  // Tick — identical logic to what was in Metronome.tsx
+  const metTick = useCallback(() => {
+    metBeatCountRef.current = (metBeatCountRef.current % metTimeSig) + 1
+    const next     = metBeatCountRef.current
+    const isAccent = next === metAccentBeat
+    createMetronomeClick(isAccent)
+    if (settings.hapticFeedback) haptic(isAccent ? [5, 0, 5] : 5)
+    setMetBeat(next)
+    setTimeout(() => setMetBeat(0), 90)
+  }, [metTimeSig, metAccentBeat, settings.hapticFeedback])
+
+  // Interval — survives navigation because it lives in App (never unmounts)
+  useEffect(() => {
+    if (!metRunning) {
+      if (metIntervalRef.current) clearInterval(metIntervalRef.current)
+      return
+    }
+    const ms = (60 / metBpm) * 1000
+    metTick()
+    metIntervalRef.current = setInterval(metTick, ms)
+    return () => { if (metIntervalRef.current) clearInterval(metIntervalRef.current) }
+  }, [metRunning, metBpm, metTick])
+
+  const toggleMetRunning = useCallback(() => {
+    haptic(15)
+    setMetActive(true)          // mark session active (idempotent on resume)
+    setMetRunning((v) => {
+      if (v) metBeatCountRef.current = 0
+      return !v
+    })
+  }, [])
+
+  const stopMetronome = useCallback(() => {
+    metBeatCountRef.current = 0
+    setMetRunning(false)
+    setMetBeat(0)
+    setMetActive(false)         // end the session → mini-player dismissed
+  }, [])
+
+  const handleMetTimeSig = useCallback(() => {
+    setMetTimeSig((prev) => {
+      const idx  = TIME_SIG_CYCLE.indexOf(prev)
+      const next = TIME_SIG_CYCLE[(idx + 1) % TIME_SIG_CYCLE.length]
+      // Clamp accent beat to new time sig
+      if (metAccentBeat > next) setMetAccentBeat(1)
+      metBeatCountRef.current = 0
+      setMetBeat(0)
+      return next
+    })
+  }, [metAccentBeat])
+
+  const openMetronomeScreen = useCallback(() => {
+    setTab("practice")
+    setPracticeScreen("metronome")
+  }, [])
+
+  // Mini-player: visible while the session is active (playing OR paused)
+  // and the full Metronome screen is not already open.
+  const showMiniPlayer = metActive && !(tab === "practice" && practiceScreen === "metronome")
 
   useEffect(() => { localStorage.setItem("ukepocket_last_tab", tab) }, [tab])
 
@@ -192,6 +286,8 @@ export default function App() {
       className="app-shell flex flex-col"
       style={{ height: "100dvh", background: "var(--background)", color: "var(--foreground)" }}
     >
+      <StartupSplash />
+
       {/* ── Navigation bar ────────────────────────────────────────────── */}
       <header
         className="ios-header shrink-0 flex items-center justify-between"
@@ -261,7 +357,23 @@ export default function App() {
 
       {/* ── Tab content ───────────────────────────────────────────────── */}
       <main className="flex-1 min-h-0 overflow-hidden">
-        {tab === "practice" && <PracticeTab />}
+        {tab === "practice" && (
+          <PracticeTab
+            screen={practiceScreen}
+            onScreenChange={setPracticeScreen}
+            metronome={{
+              bpm:               metBpm,
+              running:           metRunning,
+              beat:              metBeat,
+              timeSig:           metTimeSig,
+              accentBeat:        metAccentBeat,
+              onBpmChange:       setMetBpm,
+              onToggleRunning:   toggleMetRunning,
+              onTimeSigChange:   handleMetTimeSig,
+              onAccentBeatChange:setMetAccentBeat,
+            }}
+          />
+        )}
 
         {tab === "songs" && (
           <div className="h-full flex flex-col overflow-hidden">
@@ -287,6 +399,18 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* ── Metronome mini-player — shown above nav when running away from Metronome screen ── */}
+      {showMiniPlayer && (
+        <MetronomeMiniPlayer
+          bpm={metBpm}
+          running={metRunning}
+          beat={metBeat}
+          onToggleRunning={toggleMetRunning}
+          onStop={stopMetronome}
+          onOpen={openMetronomeScreen}
+        />
+      )}
 
       {/* ── Bottom tab bar ────────────────────────────────────────────── */}
       <nav className="bottom-nav shrink-0 flex" aria-label="Main navigation">
