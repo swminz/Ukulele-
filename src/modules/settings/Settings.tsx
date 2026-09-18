@@ -15,7 +15,7 @@ import {
 // All handlers already reference these constants — just drop in the URL.
 const PLAY_STORE_URL     = ""  // TODO: https://play.google.com/store/apps/details?id=com.swminz.ukepocket
 const APP_STORE_URL      = ""  // TODO: https://apps.apple.com/app/ukepocket/id...
-const PRIVACY_POLICY_URL = ""  // TODO: https://ukepocket.app/privacy
+const PRIVACY_POLICY_URL = "https://ululele-fxp7.vercel.app/privacy"
 const TERMS_URL          = ""  // TODO: https://ukepocket.app/terms
 
 // ── Toggle switch ─────────────────────────────────────────────────────────────
